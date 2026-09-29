@@ -1,0 +1,198 @@
+version: '3.8'
+
+services:
+  # ── Message Broker ──────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── Database (single instance, 4 databases) ────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gemelo
+      POSTGRES_PASSWORD: gemelo123
+      POSTGRES_DB: gemelo
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./scripts/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U gemelo
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Purchases Service (NestJS) ─────────────────────────────
+  purchases-svc:
+    build: ./services/purchases
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: "3001"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: gemelo
+      DB_PASS: gemelo123
+      DB_NAME: purchases_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Energy Service (NestJS) ────────────────────────────────
+  energy-svc:
+    build: ./services/energy
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: "3002"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: gemelo
+      DB_PASS: gemelo123
+      DB_NAME: energy_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Food Service (NestJS) ──────────────────────────────────
+  food-svc:
+    build: ./services/food
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: "3003"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: gemelo
+      DB_PASS: gemelo123
+      DB_NAME: food_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Gamification Service (NestJS) ──────────────────────────
+  gamification-svc:
+    build: ./services/gamification
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: "3004"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: gemelo
+      DB_PASS: gemelo123
+      DB_NAME: gamification_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Simulation Service (Python / FastAPI) ──────────────────
+  simulation-svc:
+    build: ./services/simulation
+    ports:
+      - "8000:8000"
+    environment:
+      PURCHASES_URL: http://purchases-svc:3001
+      ENERGY_URL: http://energy-svc:3002
+      FOOD_URL: http://food-svc:3003
+    depends_on:
+      - purchases-svc
+      - energy-svc
+      - food-svc
+    restart: on-failure
+
+  # ── Invoices Service (Python / OCR) ────────────────────────
+  invoices-svc:
+    build: ./services/invoices
+    ports:
+      - "3005:3005"
+    environment:
+      PORT: "3005"
+    restart: on-failure
+
+  # ── Finances Service (NestJS) ─────────────────────────────
+  finances-svc:
+    build: ./services/finances
+    ports:
+      - "3006:3006"
+    environment:
+      PORT: "3006"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: gemelo
+      DB_PASS: gemelo123
+      DB_NAME: finances_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── API Gateway (NestJS) ───────────────────────────────────
+  gateway:
+    build: ./gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      PURCHASES_URL: http://purchases-svc:3001
+      ENERGY_URL: http://energy-svc:3002
+      FOOD_URL: http://food-svc:3003
+      GAMIFICATION_URL: http://gamification-svc:3004
+      SIMULATION_URL: http://simulation-svc:8000
+      INVOICES_URL: http://invoices-svc:3005
+      FINANCES_URL: http://finances-svc:3006
+    depends_on:
+      - purchases-svc
+      - energy-svc
+      - food-svc
+      - gamification-svc
+      - simulation-svc
+      - invoices-svc
+      - finances-svc
+    restart: on-failure
+
+  # ── Frontend (Next.js) ─────────────────────────────────────
+  frontend:
+    build: ./frontend
+    ports:
+      - "4000:4000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      PORT: "4000"
+    depends_on:
+      - gateway
+
+volumes:
+  pgdata:
