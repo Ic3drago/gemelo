@@ -1,27 +1,17 @@
 import { Controller, Post, Get, Body, Query } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
-import { RabbitMQService } from './rabbitmq.service';
 
+/**
+ * El controller es solo la capa de presentación HTTP.
+ * Toda la lógica de negocio vive en el service y en la entidad.
+ */
 @Controller()
 export class PurchaseController {
-  constructor(
-    private readonly service: PurchaseService,
-    private readonly rabbitmq: RabbitMQService,
-  ) {}
+  constructor(private readonly service: PurchaseService) {}
 
   @Post('purchases')
   async create(@Body() body: any) {
-    const saved = await this.service.create(body);
-    await this.rabbitmq.publish('purchase.registered', {
-      purchaseId: saved.id,
-      householdId: saved.householdId,
-      category: saved.category,
-      item: saved.item,
-      amountBs: saved.amountBs,
-      co2EstimateKg: saved.co2EstimateKg,
-      timestamp: saved.timestamp,
-    });
-    return saved;
+    return this.service.create(body);
   }
 
   @Get('purchases')
@@ -30,12 +20,12 @@ export class PurchaseController {
     @Query('from') from: string,
     @Query('to') to: string,
   ) {
-    return await this.service.findAll({ householdId, from, to });
+    return this.service.findAll({ householdId, from, to });
   }
 
   @Get('purchases/summary')
   async getSummary(@Query('householdId') householdId: string) {
-    return await this.service.getSummary(householdId);
+    return this.service.getSummary(householdId);
   }
 
   @Get('health')

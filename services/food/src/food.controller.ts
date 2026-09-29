@@ -1,6 +1,11 @@
 import { Controller, Post, Get, Patch, Param, Body, Query } from '@nestjs/common';
 import { FoodService } from './food.service';
 
+/**
+ * El controller es solo la capa de presentación HTTP.
+ * Toda la lógica de transición de estados y CO₂ vive en la entidad Food.
+ */
+
 @Controller('food')
 export class FoodController {
   constructor(private readonly foodService: FoodService) {}

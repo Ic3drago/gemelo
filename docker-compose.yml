@@ -47,7 +47,7 @@ services:
       DB_USER: gemelo
       DB_PASS: gemelo123
       DB_NAME: purchases_db
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RABBITMQ_URL: amqp://gemelo:gemelo123@rabbitmq:5672
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,7 +67,7 @@ services:
       DB_USER: gemelo
       DB_PASS: gemelo123
       DB_NAME: energy_db
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RABBITMQ_URL: amqp://gemelo:gemelo123@rabbitmq:5672
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,7 +87,7 @@ services:
       DB_USER: gemelo
       DB_PASS: gemelo123
       DB_NAME: food_db
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RABBITMQ_URL: amqp://gemelo:gemelo123@rabbitmq:5672
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,7 +107,7 @@ services:
       DB_USER: gemelo
       DB_PASS: gemelo123
       DB_NAME: gamification_db
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RABBITMQ_URL: amqp://gemelo:gemelo123@rabbitmq:5672
     depends_on:
       postgres:
         condition: service_healthy
@@ -151,7 +151,7 @@ services:
       DB_USER: gemelo
       DB_PASS: gemelo123
       DB_NAME: finances_db
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RABBITMQ_URL: amqp://gemelo:gemelo123@rabbitmq:5672
     depends_on:
       postgres:
         condition: service_healthy

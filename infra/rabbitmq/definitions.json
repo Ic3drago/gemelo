@@ -4,15 +4,15 @@
   ],
   "users": [
     {
-      "name": "guest",
-      "password_hash": "BMkxb+w19P63zB5+3X/lY9X81e5oN7r2nK7t8e9Q5X5Q4Q==",
+      "name": "gemelo",
+      "password_hash": "/qmrq+HG6XZ3nctiVXElNExKUV6pYBpIjKdbJt2fI5p+DARo",
       "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ["administrator"]
     }
   ],
   "permissions": [
     {
-      "user": "guest",
+      "user": "gemelo",
       "vhost": "/",
       "configure": ".*",
       "write": ".*",

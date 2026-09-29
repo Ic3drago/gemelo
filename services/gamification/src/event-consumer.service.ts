@@ -1,7 +1,12 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import { GamificationService } from './gamification.service';
+import { PointsPolicy } from './domain/points-policy';
 
+/**
+ * Adaptador de infraestructura: traduce mensajes RabbitMQ a llamadas de dominio.
+ * No contiene ninguna regla de negocio — esas viven en PointsPolicy.
+ */
 @Injectable()
 export class EventConsumerService implements OnModuleInit {
   private readonly logger = new Logger(EventConsumerService.name);
@@ -23,8 +28,6 @@ export class EventConsumerService implements OnModuleInit {
         await channel.assertExchange(exchange, 'topic', { durable: true });
 
         const q = await channel.assertQueue('gamification.events', { durable: true });
-
-        // Bind all required routing keys
         await channel.bindQueue(q.queue, exchange, 'purchase.registered');
         await channel.bindQueue(q.queue, exchange, 'energy.reading');
         await channel.bindQueue(q.queue, exchange, 'food.consumed');
@@ -39,6 +42,7 @@ export class EventConsumerService implements OnModuleInit {
               const routingKey = msg.fields.routingKey;
               const householdId = content.householdId || 'hogar_001';
 
+              // Traducir el evento de infraestructura a una award de dominio
               await this.processEvent(routingKey, householdId, content);
 
               channel.ack(msg);
@@ -57,25 +61,42 @@ export class EventConsumerService implements OnModuleInit {
     }
   }
 
-  private async processEvent(routingKey: string, householdId: string, content: any) {
-    if (routingKey === 'purchase.registered') {
-      const item = content.item || 'Producto';
-      await this.gamificationService.awardPoints(householdId, 5, `Compra registrada: ${item}`, routingKey);
-    } else if (routingKey === 'energy.reading') {
-      const kwh = content.kWh || 0;
-      if (kwh < 5) {
-        await this.gamificationService.awardPoints(householdId, 15, 'Lectura energética eficiente', routingKey);
-      } else {
-        await this.gamificationService.awardPoints(householdId, 3, 'Lectura registrada', routingKey);
-      }
-    } else if (routingKey === 'food.consumed') {
-      const name = content.name || 'Alimento';
-      await this.gamificationService.awardPoints(householdId, 10, `Alimento consumido sin desperdiciar: ${name}`, routingKey);
-    } else if (routingKey === 'food.wasted') {
-      const name = content.name || 'Alimento';
-      await this.gamificationService.awardPoints(householdId, -5, `Desperdicio de alimento: ${name}`, routingKey);
+  /**
+   * Obtiene la award correspondiente de PointsPolicy (dominio) y la aplica.
+   * Este método es solo un despachador — sin condicionales de negocio propios.
+   */
+  private async processEvent(
+    routingKey: string,
+    householdId: string,
+    content: any,
+  ): Promise<void> {
+    let award: { points: number; reason: string } | null = null;
+
+    switch (routingKey) {
+      case 'purchase.registered':
+        award = PointsPolicy.forPurchase(content.item || 'Producto');
+        break;
+      case 'energy.reading':
+        award = PointsPolicy.forEnergyReading(content.kWh || 0);
+        break;
+      case 'food.consumed':
+        award = PointsPolicy.forFoodConsumed(content.name || 'Alimento');
+        break;
+      case 'food.wasted':
+        award = PointsPolicy.forFoodWasted(content.name || 'Alimento');
+        break;
+      default:
+        this.logger.warn(`Evento desconocido ignorado: ${routingKey}`);
     }
 
-    await this.gamificationService.checkAchievements(householdId);
+    if (award) {
+      await this.gamificationService.awardPoints(
+        householdId,
+        award.points,
+        award.reason,
+        routingKey,
+      );
+      await this.gamificationService.checkAchievements(householdId);
+    }
   }
 }

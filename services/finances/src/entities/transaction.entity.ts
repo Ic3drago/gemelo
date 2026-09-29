@@ -1,5 +1,8 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
+/** Tipos válidos de transacción — reemplaza el string libre con comentario */
+export type TransactionType = 'income' | 'expense';
+
 @Entity()
 export class Transaction {
   @PrimaryGeneratedColumn('uuid')
@@ -11,8 +14,9 @@ export class Transaction {
   @Column('decimal', { precision: 10, scale: 2 })
   amount: number;
 
+  /** 'income' | 'expense' — validado en el service antes de persistir */
   @Column()
-  type: string; // income, expense
+  type: TransactionType;
 
   @Column()
   category: string;
