@@ -1,29 +1,18 @@
 import { Controller, Post, Get, Body, Query } from '@nestjs/common';
 import { EnergyService } from './energy.service';
-import { RabbitMQService } from './rabbitmq.service';
 
+/**
+ * El controller es solo la capa de presentación HTTP.
+ * No contiene ninguna lógica de negocio (sin cálculos de CO₂,
+ * sin magic numbers, sin llamadas directas a RabbitMQ).
+ */
 @Controller('energy')
 export class EnergyController {
-  constructor(
-    private readonly service: EnergyService,
-    private readonly rabbitmq: RabbitMQService,
-  ) {}
+  constructor(private readonly service: EnergyService) {}
 
   @Post('readings')
   async create(@Body() body: any) {
-    const co2EstimateKg = body.kWh * 0.5;
-    const data = { ...body, co2EstimateKg };
-    const saved = await this.service.create(data);
-    await this.rabbitmq.publish('energy.reading', {
-      readingId: saved.id,
-      householdId: saved.householdId,
-      deviceType: saved.deviceType,
-      kWh: saved.kWh,
-      costBs: saved.costBs,
-      co2EstimateKg: saved.co2EstimateKg,
-      timestamp: saved.timestamp,
-    });
-    return saved;
+    return this.service.create(body);
   }
 
   @Get('readings')
@@ -33,12 +22,12 @@ export class EnergyController {
     @Query('to') to: string,
     @Query('deviceType') deviceType: string,
   ) {
-    return await this.service.findAll({ householdId, from, to, deviceType });
+    return this.service.findAll({ householdId, from, to, deviceType });
   }
 
   @Get('summary')
   async getSummary(@Query('householdId') householdId?: string) {
-    return await this.service.getSummary(householdId);
+    return this.service.getSummary(householdId);
   }
 }
 

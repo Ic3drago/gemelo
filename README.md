@@ -60,19 +60,85 @@ Un sistema de microservicios para monitorizar y simular el impacto ambiental del
 
 ## 🎮 Reglas de Gamificación
 
-- **+10 pts** por cada compra registrada.
-- **-5 pts** por cada kg de comida desperdiciada (`wasted`).
-- **+15 pts** por comida consumida (`consumed`).
-- **+5 pts** por mantener consumo energético bajo (condicionado a lógica de backend).
+Definidas en `services/gamification/src/domain/points-policy.ts`:
+
+| Evento | Puntos |
+|--------|--------|
+| Compra registrada | +5 |
+| Lectura energética eficiente (< 5 kWh) | +15 |
+| Lectura energética normal | +3 |
+| Alimento consumido | +10 |
+| Alimento desperdiciado | -5 |
+
+Niveles definidos en `services/gamification/src/domain/leveling-policy.ts`:
+
+| Nivel | Nombre | Puntos mínimos |
+|-------|--------|----------------|
+| 1 | Principiante | 0 |
+| 2 | Consciente | 101 |
+| 3 | Eco-Guerrero | 501 |
+| 4 | Campeón Sostenible | 1501 |
 
 ## 🔮 Metodología de Simulación
 
-El servicio de simulación (Python/FastAPI) recopila 6 meses de datos históricos. 
-Utiliza **Regresión Lineal** (vía `scikit-learn`) para proyectar tendencias futuras de consumo (horizonte configurable en meses). 
+El servicio de simulación (Python/FastAPI) recopila 6 meses de datos históricos.
+Utiliza **Regresión Lineal** (vía `scikit-learn`) para proyectar tendencias futuras de consumo (horizonte configurable en meses).
 Aplica porcentajes de reducción de escenario para calcular:
 - Ahorros económicos (Bs)
 - Reducción de Huella de Carbono (Kg CO2)
-- Metricas de desperdicio y consumo.
+- Métricas de desperdicio y consumo
+
+Los factores de conversión están centralizados en `services/simulation/app/domain/carbon_factors.py`.
+
+## ♻️ Factores de Carbono (única fuente de verdad)
+
+Todos los cálculos de CO₂ del sistema usan las mismas constantes de dominio:
+
+| Factor | Valor | Ubicación |
+|--------|-------|-----------|
+| kg CO₂ / kWh eléctrico | 0.5 | `CarbonFactor.KG_CO2_PER_KWH` (energy) · `CarbonFactors.KG_CO2_PER_KWH` (simulation) |
+| kg CO₂ / kg alimento desperdiciado | 2.5 | `CO2_KG_PER_KG_WASTED` (food) · `CarbonFactors.KG_CO2_PER_KG_WASTE` (simulation) |
+| kg CO₂ / Bs de compra | 0.01 | `PurchaseCategory.CO2_FACTOR_PER_BS` (purchases) · `CarbonFactors.KG_CO2_PER_BS_PURCHASE` (simulation) |
+| Bs ahorrados / kWh reducido | 0.89 | `CarbonFactor.BS_PER_KWH` (energy) · `CarbonFactors.BS_SAVINGS_PER_KWH` (simulation) |
+
+## 🏛️ Modelo de Dominio (DDD)
+
+Cada servicio aplica los principios de Domain-Driven Design. A continuación, los objetos de dominio clave:
+
+### Value Objects
+
+| Archivo | Qué encapsula |
+|---------|---------------|
+| `services/energy/src/carbon-factor.vo.ts` | Factor kWh→CO₂ y tarifa Bs/kWh; inmutable |
+| `services/purchases/src/purchase-category.vo.ts` | Categorías válidas de compra y su factor CO₂ por Bs |
+| `services/food/src/food-status.vo.ts` | Estados del alimento y transiciones permitidas (`stored → consumed/wasted`) |
+
+### Comportamiento en Entidades (Aggregates)
+
+| Entidad | Comportamiento agregado |
+|---------|------------------------|
+| `EnergyReading` | `applyCarbon()` — calcula CO₂ y costo usando `CarbonFactor` |
+| `Purchase` | `applyCarbon()` — calcula CO₂ según categoría; `getCategory()` |
+| `Food` | `transitionTo(status)` — valida la transición y aplica CO₂ si es desperdicio |
+| `Account` | `applyIncome()`, `applyExpense()`, `applyTransaction()` — guarda la invariante de balance |
+
+### Domain Services / Policies
+
+| Archivo | Responsabilidad |
+|---------|----------------|
+| `services/gamification/src/domain/leveling-policy.ts` | Calcula nivel a partir de puntos acumulados |
+| `services/gamification/src/domain/points-policy.ts` | Define cuántos puntos otorga cada evento de dominio |
+| `services/simulation/app/domain/carbon_factors.py` | Factores de conversión CO₂ y métodos de cálculo de impacto |
+
+### Separación de capas (por servicio)
+
+```
+Controller / Route handler   →  solo HTTP: deserializar request, llamar service, serializar response
+Service (Application layer)  →  orquestar: llamar entidades/VOs, persistir, publicar eventos
+Entity / Aggregate           →  reglas de negocio: invariantes, cálculos, transiciones de estado
+Value Object / Policy        →  lógica de dominio reutilizable sin identidad propia
+Infrastructure (RabbitMQ)    →  adaptar eventos externos → llamadas de dominio
+```
 
 ## 🎓 Guía de Demostración
 
@@ -110,4 +176,3 @@ Esto creará eventos aleatorios cada 3-5 segundos (compras, uso de energía, des
 | Frontend | 4000 |
 | RabbitMQ | 5672, 15672 |
 | PostgreSQL | 5432 |
-# gemelo

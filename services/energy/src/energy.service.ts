@@ -2,22 +2,53 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EnergyReading } from './energy-reading.entity';
+import { CarbonFactor } from './carbon-factor.vo';
+import { RabbitMQService } from './rabbitmq.service';
 
 @Injectable()
 export class EnergyService {
   constructor(
     @InjectRepository(EnergyReading)
     private readonly repository: Repository<EnergyReading>,
+    private readonly rabbitmq: RabbitMQService,
   ) {}
 
+  /**
+   * Crea una lectura de energía aplicando la lógica de dominio (CO₂ y costo)
+   * dentro de la entidad, y publica el evento de dominio correspondiente.
+   * El controlador ya no conoce nada de CO₂ ni de RabbitMQ.
+   */
   async create(data: Partial<EnergyReading>): Promise<EnergyReading> {
     const reading = this.repository.create(data);
-    return await this.repository.save(reading);
+
+    // Comportamiento de dominio: la entidad calcula sus propios campos derivados
+    reading.applyCarbon(CarbonFactor.default());
+
+    const saved = await this.repository.save(reading);
+
+    // La publicación del evento es responsabilidad del service (capa aplicación),
+    // no del controller (capa presentación).
+    await this.rabbitmq.publish('energy.reading', {
+      readingId: saved.id,
+      householdId: saved.householdId,
+      deviceType: saved.deviceType,
+      kWh: saved.kWh,
+      costBs: saved.costBs,
+      co2EstimateKg: saved.co2EstimateKg,
+      timestamp: saved.timestamp,
+    });
+
+    return saved;
   }
 
-  async findAll(filters: { householdId?: string; from?: string; to?: string; deviceType?: string }): Promise<EnergyReading[]> {
+  async findAll(filters: {
+    householdId?: string;
+    from?: string;
+    to?: string;
+    deviceType?: string;
+  }): Promise<EnergyReading[]> {
     const query = this.repository.createQueryBuilder('reading');
-    
+
     if (filters.householdId) {
       query.andWhere('reading.householdId = :householdId', { householdId: filters.householdId });
     }
@@ -30,13 +61,14 @@ export class EnergyService {
     if (filters.to) {
       query.andWhere('reading.timestamp <= :to', { to: filters.to });
     }
-    
+
     query.orderBy('reading.timestamp', 'DESC');
-    return await query.getMany();
+    return query.getMany();
   }
 
   async getSummary(householdId?: string) {
-    const query = this.repository.createQueryBuilder('reading')
+    const query = this.repository
+      .createQueryBuilder('reading')
       .select("TO_CHAR(reading.timestamp, 'YYYY-MM')", 'month')
       .addSelect('SUM(reading.kWh)', 'totalKwh')
       .addSelect('SUM(reading.costBs)', 'totalCostBs')
@@ -54,14 +86,21 @@ export class EnergyService {
     let totalKwh = 0;
     let totalCo2 = 0;
     let totalCostBs = 0;
-    const summary = rawResults.map(row => {
+
+    const summary = rawResults.map((row) => {
       const kwh = parseFloat(row.totalKwh) || 0;
       const co2 = parseFloat(row.totalCo2) || 0;
       const cost = parseFloat(row.totalCostBs) || 0;
       totalKwh += kwh;
       totalCo2 += co2;
       totalCostBs += cost;
-      return { month: row.month, totalKwh: kwh, totalCostBs: cost, totalCo2: co2, count: parseInt(row.count) || 0 };
+      return {
+        month: row.month,
+        totalKwh: kwh,
+        totalCostBs: cost,
+        totalCo2: co2,
+        count: parseInt(row.count) || 0,
+      };
     });
 
     return { summary, totalKwh, totalCo2, totalCostBs };

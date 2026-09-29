@@ -2,92 +2,118 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { Home, TrendingUp, Wallet, Trophy, BookOpen, Plus } from 'lucide-react';
+import { Logo } from '@/design-system/Logo';
+
+const navItems = [
+  { name: 'Inicio',        href: '/',           icon: Home },
+  { name: 'Predicciones',  href: '/simulador',  icon: TrendingUp },
+  { name: 'Presupuesto',   href: '/presupuesto', icon: Wallet },
+  { name: 'Logros',        href: '/logros',     icon: Trophy },
+  { name: 'Guia',          href: '/guia',       icon: BookOpen },
+];
 
 export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Hide navigation on onboarding
-  if (pathname.startsWith('/onboarding')) {
-    return null;
-  }
-
-  const navItems = [
-    { name: 'Inicio', href: '/', icon: '🌿' },
-    { name: 'Predicciones', href: '/predicciones', icon: '🔮' },
-    { name: 'Presupuesto', href: '/presupuesto', icon: '💰' },
-    { name: 'Logros', href: '/logros', icon: '🏆' },
-  ];
+  if (pathname.startsWith('/onboarding')) return null;
 
   return (
     <>
-      {/* Desktop Sidebar (hidden by default in mobile-first, but kept for large screens) */}
-      <aside className="hidden md:flex flex-col w-64 h-screen fixed left-0 top-0 clean-card !border-y-0 !border-l-0 !rounded-none z-50 bg-white">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-green-700 mb-1">🌿 Gemelo Digital</h1>
+      {/* ── Desktop Sidebar ── */}
+      <aside className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-[240px] bg-white dark:bg-stone-950 border-r border-stone-200 dark:border-stone-800 z-40">
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-stone-100 dark:border-stone-800">
+          <Logo size={28} showName />
         </div>
-        <nav className="flex-1 px-4 mt-6">
-          <ul className="space-y-2">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <li key={item.name}>
-                  <Link href={item.href}
-                    className={`flex items-center px-4 py-3 rounded-xl transition-all duration-300 ${
-                      isActive 
-                        ? 'bg-green-50 text-green-700 font-semibold' 
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-green-600'
-                    }`}
-                  >
-                    <span className="mr-3 text-xl">{item.icon}</span>
-                    <span className="font-medium">{item.name}</span>
-                  </Link>
-                </li>
-              );
-            })}
-            <li className="pt-4">
-              <button 
-                onClick={() => router.push('/escanear')}
-                className="w-full flex justify-center items-center gap-2 bg-green-600 text-white p-3 rounded-xl hover:bg-green-700 transition"
-              >
-                <span>+</span>
-                <span>Registrar</span>
-              </button>
-            </li>
-          </ul>
-        </nav>
-      </aside>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-100 z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <div className="relative flex justify-around items-end h-16 px-2 pb-2">
-          {navItems.slice(0, 2).map((item) => {
-            const isActive = pathname === item.href;
+        {/* Nav links */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {navItems.map(({ name, href, icon: Icon }) => {
+            const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
             return (
-              <Link key={item.name} href={item.href} className="flex flex-col items-center justify-center w-16">
-                <span className={`text-2xl mb-1 ${isActive ? 'scale-110' : 'opacity-70'} transition-transform`}>{item.icon}</span>
-                <span className={`text-[10px] font-medium ${isActive ? 'text-green-700' : 'text-gray-500'}`}>{item.name}</span>
+              <Link
+                key={href}
+                href={href}
+                className={[
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-forest-50 text-forest-700 dark:bg-forest-950 dark:text-forest-300'
+                    : 'text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800',
+                ].join(' ')}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {name}
               </Link>
             );
           })}
-          
-          {/* FAB - Central Button */}
-          <div className="relative -top-5 flex flex-col items-center justify-center w-16">
-            <button 
-              onClick={() => router.push('/escanear')}
-              className="w-14 h-14 bg-green-600 rounded-full flex items-center justify-center text-white text-3xl shadow-lg hover:bg-green-700 hover:scale-105 transition-all"
+        </nav>
+
+        {/* Register CTA */}
+        <div className="px-3 pb-5 pt-2 border-t border-stone-100 dark:border-stone-800">
+          <Link
+            href="/registro"
+            className="flex items-center justify-center gap-2 w-full h-11 bg-forest-600 hover:bg-forest-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Registrar
+          </Link>
+        </div>
+      </aside>
+
+      {/* ── Mobile Bottom Bar ── */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-stone-950 border-t border-stone-200 dark:border-stone-800"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex items-end h-16 px-1">
+          {/* First 2 items */}
+          {navItems.slice(0, 2).map(({ name, href, icon: Icon }) => {
+            const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className="flex flex-col items-center justify-center flex-1 h-full gap-0.5"
+              >
+                <Icon
+                  className={['h-5 w-5', active ? 'text-forest-600 dark:text-forest-400' : 'text-stone-400'].join(' ')}
+                />
+                <span className={['text-[10px] font-medium', active ? 'text-forest-600 dark:text-forest-400' : 'text-stone-400'].join(' ')}>
+                  {name}
+                </span>
+              </Link>
+            );
+          })}
+
+          {/* FAB — center */}
+          <div className="flex flex-col items-center justify-end flex-1 pb-1 relative">
+            <button
+              onClick={() => router.push('/registro')}
+              className="w-14 h-14 -mt-6 bg-forest-600 hover:bg-forest-700 active:bg-forest-800 text-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+              aria-label="Registrar"
             >
-              +
+              <Plus className="h-6 w-6" />
             </button>
-            <span className="text-[10px] font-medium text-gray-500 mt-1">Registrar</span>
+            <span className="text-[10px] font-medium text-stone-400 mt-0.5">Registrar</span>
           </div>
 
-          {navItems.slice(2, 4).map((item) => {
-            const isActive = pathname === item.href;
+          {/* Last 2 items */}
+          {navItems.slice(2, 4).map(({ name, href, icon: Icon }) => {
+            const active = pathname.startsWith(href);
             return (
-              <Link key={item.name} href={item.href} className="flex flex-col items-center justify-center w-16">
-                <span className={`text-2xl mb-1 ${isActive ? 'scale-110' : 'opacity-70'} transition-transform`}>{item.icon}</span>
-                <span className={`text-[10px] font-medium ${isActive ? 'text-green-700' : 'text-gray-500'}`}>{item.name}</span>
+              <Link
+                key={href}
+                href={href}
+                className="flex flex-col items-center justify-center flex-1 h-full gap-0.5"
+              >
+                <Icon
+                  className={['h-5 w-5', active ? 'text-forest-600 dark:text-forest-400' : 'text-stone-400'].join(' ')}
+                />
+                <span className={['text-[10px] font-medium', active ? 'text-forest-600 dark:text-forest-400' : 'text-stone-400'].join(' ')}>
+                  {name}
+                </span>
               </Link>
             );
           })}
