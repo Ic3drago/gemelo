@@ -133,7 +133,7 @@ export default function SimuladorPage() {
 
       <Card variant="flat" className="space-y-4">
         <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-semibold">Proyección a seis meses</h2><p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Regresión lineal y rango estimado de variación</p></div>{preliminary && <Badge variant="warning">Predicción preliminar</Badge>}</div>
-        <div className="grid grid-cols-3 gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-700 dark:bg-stone-900">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-700 dark:bg-stone-900">
           {(['gasto', 'energia', 'desperdicio'] as const).map((value) => <button key={value} type="button" aria-pressed={metric === value} onClick={() => selectMetric(value)} className={['min-h-10 rounded-md px-2 text-xs font-semibold', metric === value ? 'bg-white text-forest-800 shadow-sm dark:bg-stone-800 dark:text-white' : 'text-stone-500'].join(' ')}>{value === 'gasto' ? 'Gasto' : value === 'energia' ? 'Energía' : 'Desperdicio'}</button>)}
         </div>
         <div className="h-56">
@@ -236,7 +236,7 @@ export default function SimuladorPage() {
         <div className="lg:col-span-2 space-y-5">
           {loading ? (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <SkeletonCard />
                 <SkeletonCard />
                 <SkeletonCard />
@@ -255,7 +255,7 @@ export default function SimuladorPage() {
           ) : (
             <div className="space-y-5 animate-fade-in">
               {/* Impact cards */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {impactCards.map(({ label, value, unit, icon, color, bg }) => (
                   <Card key={label} variant="flat" className="flex items-center gap-3">
                     <div className={['w-10 h-10 rounded-xl flex items-center justify-center shrink-0', bg, color].join(' ')}>

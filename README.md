@@ -118,6 +118,24 @@ El seed espera al gateway, genera compras en cinco categorías, lecturas/factura
 
 Para actividad continua ejecuta `node scripts/live-generator.js`; incluye compras, energía, alimentos y facturas ocasionales.
 
+## Probar desde el teléfono
+
+Los puertos ya se publican en todas las interfaces, así que basta con la IP del equipo en la red local. Para descubrirla:
+
+```bash
+hostname -I
+```
+
+Con `192.168.101.10` como ejemplo, desde el móvil se entra a `http://192.168.101.10:4000`. Importante: las variables `NEXT_PUBLIC_*` se incrustan en el bundle durante el build, así que la URL del gateway que usa el navegador queda fija en ese momento. Con el valor por defecto (`http://localhost:3000`) el móvil no podrá llamar al gateway, porque `localhost` en el teléfono es el propio teléfono. Para que funcione hay que hornear la IP antes de reconstruir:
+
+```bash
+NEXT_PUBLIC_API_URL=http://192.168.101.10:3000 docker compose up -d --build frontend
+```
+
+Si prefieres fijarlo de forma permanente, exporta esa variable en la sesión o en un `.env` junto a `docker-compose.yml`. Alternar entre `localhost` (para trabajar en el equipo) y la IP (para probar en el móvil) obliga a reconstruir la imagen del frontend.
+
+Sobre la cámara: el escaneo de facturas usa `<input type="file" capture="environment">`, que abre la cámara del móvil sin necesidad de HTTPS. Lo que sí exige HTTPS es `getUserMedia`, es decir la cámara en vivo dentro de la página, porque los navegadores solo la entregan en un contexto seguro. `localhost` cuenta como seguro, una IP en HTTP plano no. La interfaz muestra un aviso cuando detecta ese caso.
+
 ## Pruebas unitarias
 
 Con las dependencias de desarrollo instaladas, desde cada carpeta de servicio:
@@ -128,6 +146,12 @@ npm --prefix services/gamification test
 npm --prefix services/food test
 npm --prefix services/finances test
 cd services/simulation && python -m unittest discover -s tests -v
+```
+
+El servicio de simulación necesita `numpy`, así que sus pruebas solo corren donde estén instaladas sus dependencias:
+
+```bash
+docker compose exec simulation-svc python -m unittest discover -s tests -v
 ```
 
 Las pruebas cubren el ejemplo de tarifa de Bs 264,28, puntos/niveles, transiciones de alimentos, invariante de balance, regresión/rangos y ahorro del simulador.

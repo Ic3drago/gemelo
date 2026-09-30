@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface BottomSheetProps {
@@ -21,9 +22,17 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  if (!open) return null;
+  // Render into <body> instead of in place. Many pages wrap their content in
+  // `animate-fade-in`, and that animation leaves a transform on the ancestor,
+  // which makes it the containing block for `position: fixed`. The sheet then
+  // anchored to the wrong box and opened half off-screen, with its first
+  // controls unreachable at a negative y.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  return (
+  if (!open || !mounted) return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -35,8 +44,8 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       {/* Sheet */}
       <div
         className={[
-          'fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl bg-white dark:bg-stone-900 shadow-xl',
-          'flex flex-col max-h-[90vh] transition-transform duration-300',
+          'fixed bottom-0 inset-x-0 z-50 rounded-t-3xl bg-white dark:bg-stone-900 shadow-xl',
+          'flex flex-col h-[90vh] max-h-[90vh] transition-transform duration-300',
           open ? 'translate-y-0' : 'translate-y-full',
         ].join(' ')}
         role="dialog"
@@ -66,7 +75,8 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
           {children}
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 

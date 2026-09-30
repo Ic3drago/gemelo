@@ -212,7 +212,7 @@ input[type='range']::-webkit-slider-thumb:active {
 .app-shell { min-height: 100dvh; }
 .app-main { width: 100%; max-width: 1200px; margin: 0 auto; padding: 24px 20px 104px; }
 .app-main-landing { max-width: none; padding: 0; }
-.app-main-device { max-width: 480px; min-height: 100dvh; padding: 18px 16px 96px; }
+.app-main-device { max-width: 720px; min-height: 100dvh; padding: 18px 16px 96px; }
 .app-shortcuts { display: flex; justify-content: flex-end; gap: 12px; margin: 0 auto 12px; font-size: 12px; color: var(--primary); }
 .app-shortcuts a { min-height: 36px; display: inline-flex; align-items: center; }
 .pwa-install { position: fixed; z-index: 60; right: 16px; bottom: 82px; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px #12251a22; font-size: 13px; }
@@ -483,7 +483,7 @@ input[type='range']::-webkit-slider-thumb:active {
 
 @media (min-width: 768px) {
   .app-shell-device { min-height: 100vh; display: flex; justify-content: center; padding: 16px 16px 24px; }
-  .app-main-device { width: 456px; max-width: 456px; min-height: calc(100vh - 40px); padding: 18px 16px 90px; border: 10px solid #26392d; border-radius: 34px; background: var(--bg); box-shadow: 0 18px 60px #18332226; overflow: auto; }
+  .app-main-device { width: min(720px, 100%); max-width: 100%; min-height: calc(100vh - 40px); padding: 18px 16px 90px; border: 10px solid #26392d; border-radius: 34px; background: var(--bg); box-shadow: 0 18px 60px #18332226; overflow: auto; }
 }
 
 @media (max-width: 1023px) {

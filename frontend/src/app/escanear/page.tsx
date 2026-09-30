@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ScanLine, ImagePlus, ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -35,6 +35,14 @@ export default function EscanearPage() {
   const router = useRouter();
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  // Browsers only expose the camera to secure contexts. localhost counts as
+  // one, a plain http:// LAN address does not, which is worth telling the user
+  // instead of leaving a button that silently fails to open.
+  const [isSecureContext, setIsSecureContext] = useState(true);
+  useEffect(() => {
+    setIsSecureContext(typeof window !== 'undefined' && window.isSecureContext);
+  }, []);
 
   const [step, setStep] = useState<Step>('capture');
   const [file, setFile] = useState<File | null>(null);
@@ -169,11 +177,12 @@ export default function EscanearPage() {
           </div>
 
           <div className="p-4 space-y-3">
-            {/* Hidden inputs */}
+            {/* Hidden inputs. Only the camera one carries `capture`, otherwise
+                the gallery picker would also open the camera on mobile. */}
             <input
               ref={cameraInputRef}
               type="file"
-              accept="image/*,.pdf,application/pdf"
+              accept="image/*"
               capture="environment"
               className="sr-only"
               onChange={handleCameraInput}
@@ -216,6 +225,13 @@ export default function EscanearPage() {
               >
                 Extraer datos
               </Button>
+            )}
+            {!isSecureContext && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                Estás en una red sin HTTPS. La foto y la galería funcionan igual, pero
+                el navegador solo habilita la cámara en vivo con <code>https://</code> o
+                en <code>localhost</code>.
+              </p>
             )}
             <Button variant="ghost" size="md" fullWidth onClick={() => { setScannedData({ store: '', date: '', total: '', nit: '', number: '', category: 'alimentos', confidence: 'manual', items: [] }); setStep('review'); }}>
               Ingresar datos manualmente
@@ -311,17 +327,17 @@ export default function EscanearPage() {
                 Items identificados ({scannedData.items.length})
               </h3>
               <ul className="divide-y divide-stone-100 dark:divide-stone-800">
-                    {scannedData.items.map((item, i) => (
-                      <li key={i} className="space-y-2 py-3 text-sm">
-                        <div className="grid grid-cols-[1fr_110px] gap-2">
-                          <input aria-label={`Nombre del ítem ${i + 1}`} className="input-base" value={item.name} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, name: event.target.value } : entry) })} />
-                          <input aria-label={`Precio del ítem ${i + 1}`} className="input-base" type="number" min="0" step="0.01" value={item.price} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, price: event.target.value } : entry) })} />
-                        </div>
-                        <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-                          <select aria-label={`Categoría del ítem ${i + 1}`} className="input-base" value={item.category ?? 'alimentos'} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, category: event.target.value } : entry) })}><option value="alimentos">Alimentos</option><option value="servicios">Servicios</option><option value="transporte">Transporte</option><option value="ocio">Ocio</option><option value="hogar">Hogar</option></select>
-                          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={Boolean(item.perishability)} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, perishability: event.target.checked, estimatedExpiryDays: event.target.checked ? entry.estimatedExpiryDays ?? 5 : null } : entry) })} /> Perecible</label>
-                        </div>
-                        {item.perishability && <label className="block text-xs text-stone-500 dark:text-stone-400">Avisar en (días)<input type="number" min="1" max="60" className="input-base mt-1" value={item.estimatedExpiryDays ?? 5} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, estimatedExpiryDays: Number(event.target.value) } : entry) })} /></label>}
+                {scannedData.items.map((item, i) => (
+                  <li key={i} className="space-y-2 py-3 text-sm">
+                    <div className="grid grid-cols-[1fr_110px] gap-2">
+                      <input aria-label={`Nombre del ítem ${i + 1}`} className="input-base" value={item.name} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, name: event.target.value } : entry) })} />
+                      <input aria-label={`Precio del ítem ${i + 1}`} className="input-base" type="number" min="0" step="0.01" value={item.price} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, price: event.target.value } : entry) })} />
+                    </div>
+                    <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+                      <select aria-label={`Categoría del ítem ${i + 1}`} className="input-base" value={item.category ?? 'alimentos'} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, category: event.target.value } : entry) })}><option value="alimentos">Alimentos</option><option value="servicios">Servicios</option><option value="transporte">Transporte</option><option value="ocio">Ocio</option><option value="hogar">Hogar</option></select>
+                      <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={Boolean(item.perishability)} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, perishability: event.target.checked, estimatedExpiryDays: event.target.checked ? entry.estimatedExpiryDays ?? 5 : null } : entry) })} /> Perecible</label>
+                    </div>
+                    {item.perishability && <label className="block text-xs text-stone-500 dark:text-stone-400">Avisar en (días)<input type="number" min="1" max="60" className="input-base mt-1" value={item.estimatedExpiryDays ?? 5} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, estimatedExpiryDays: Number(event.target.value) } : entry) })} /></label>}
                   </li>
                 ))}
               </ul>

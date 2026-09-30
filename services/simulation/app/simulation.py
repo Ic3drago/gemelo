@@ -233,7 +233,10 @@ class SimulationEngine:
         if avg == 0:
             return False
         recent = values[-1]
-        return recent > avg * 1.3 or recent < avg * 0.7
+        # `avg` is a numpy scalar, so the comparison yields numpy.bool_. That
+        # type is not JSON serialisable and made /api/predict answer 500 with
+        # "'numpy.bool_' object is not iterable", so coerce to a plain bool.
+        return bool(recent > avg * 1.3 or recent < avg * 0.7)
 
     def project_metric(self, values: list, horizon_months: int) -> list:
         """Devuelve solo los valores de predicción central (sin bandas)."""

@@ -12,6 +12,17 @@ import { SkeletonCard } from '@/design-system/Skeleton';
 import { Badge } from '@/design-system/Badge';
 import { Toast } from '@/design-system/Toast';
 
+// Common recurring household income, so the user can log a payday in one tap
+// instead of retyping it every month. Amount is left to the form on purpose.
+const INCOME_PRESETS = [
+  { description: 'Sueldo', category: 'savings' },
+  { description: 'Trabajo independiente', category: 'savings' },
+  { description: 'Venta de casa', category: 'savings' },
+  { description: 'Pensión', category: 'savings' },
+  { description: 'Bono /quete', category: 'savings' },
+  { description: 'Devolución de impuestos', category: 'savings' },
+] as const;
+
 interface BudgetRule { label: string; target: number; spent: number; color: string; badgeVariant: 'info' | 'warning' | 'success' }
 interface Goal { id: string; name: string; target: number; current: number; weeklyContribution: number }
 interface Tx { id: string; description: string; amount: number; date: string; type: 'income' | 'expense' }
@@ -354,6 +365,29 @@ export default function PresupuestoPage() {
               ))}
             </div>
           </div>
+
+          {txForm.type === 'income' && (
+            <div>
+              <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">
+                Ingresos frecuentes
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {INCOME_PRESETS.map((preset) => (
+                  <button
+                    key={preset.description}
+                    type="button"
+                    onClick={() => setTxForm({ ...txForm, type: 'income', category: preset.category, description: preset.description })}
+                    className="rounded-full border border-forest-200 bg-forest-50 px-3 py-1.5 text-xs font-medium text-forest-800 transition-colors hover:bg-forest-100 dark:border-forest-800 dark:bg-forest-950 dark:text-forest-300 dark:hover:bg-forest-900"
+                  >
+                    {preset.description}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
+                Elige uno y luego ajusta el monto. Se suma a las cuentas del hogar.
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">Cuenta</label>

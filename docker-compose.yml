@@ -166,6 +166,10 @@ services:
       - "3000:3000"
     environment:
       PORT: "3000"
+      # Pin the origins allowed to call the API. Useful when testing from a
+      # phone, where the Origin is http://<lan-ip>:4000. Leave empty to allow
+      # any origin, which is the default for local demos.
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       PURCHASES_URL: http://purchases-svc:3001
       ENERGY_URL: http://energy-svc:3002
       FOOD_URL: http://food-svc:3003
@@ -192,7 +196,10 @@ services:
     ports:
       - "4000:4000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3000
+      # Runtime value is only informative: NEXT_PUBLIC_* is inlined at build
+      # time, so reaching the gateway from a phone needs a LAN address baked in
+      # via NEXT_PUBLIC_API_URL=http://<your-ip>:3000 before `up --build`.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       PORT: "4000"
     depends_on:
       - gateway
