@@ -12,22 +12,24 @@ interface ToastProps {
   duration?: number;
 }
 
+// The message is 14px semibold white, so each background has to clear 4.5:1
+// (WCAG AA). The 500/600 shades only reached 2.1-4.1:1, hence the 700/800 steps.
 const configs: Record<ToastType, { bg: string; icon: React.ReactNode }> = {
   success: {
-    bg: 'bg-forest-600',
-    icon: <CheckCircle2 className="h-5 w-5 text-white" />,
+    bg: 'bg-brand-700',
+    icon: <CheckCircle2 className="h-5 w-5" />,
   },
   error: {
-    bg: 'bg-rose-600',
-    icon: <XCircle className="h-5 w-5 text-white" />,
+    bg: 'bg-rose-700',
+    icon: <XCircle className="h-5 w-5" />,
   },
   info: {
-    bg: 'bg-sky-600',
-    icon: <Info className="h-5 w-5 text-white" />,
+    bg: 'bg-sky-700',
+    icon: <Info className="h-5 w-5" />,
   },
   warning: {
-    bg: 'bg-amber-500',
-    icon: <AlertTriangle className="h-5 w-5 text-white" />,
+    bg: 'bg-amber-700',
+    icon: <AlertTriangle className="h-5 w-5" />,
   },
 };
 

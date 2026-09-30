@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+import math
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 from .simulation import SimulationEngine
 from . import models, database
@@ -19,11 +20,30 @@ app.add_middleware(
 )
 
 class SimulationRequest(BaseModel):
-    householdId: str
-    horizonMonths: int
-    wasteReductionPct: float
-    energyReductionPct: float
-    purchaseChangePct: float
+    householdId: str = "hogar_001"
+    horizonMonths: int = Field(default=6, alias="months", ge=1, le=24)
+    wasteReductionPct: float = Field(default=0, alias="waste", ge=0, le=100)
+    energyReductionPct: float = Field(default=0, alias="energy", ge=0, le=100)
+    purchaseChangePct: float = Field(default=0, alias="purchases")
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_purchase_change(cls, values):
+        if not isinstance(values, dict):
+            return values
+        field = "purchases" if "purchases" in values else "purchaseChangePct"
+        if field not in values:
+            return values
+        try:
+            change = float(values[field])
+        except (TypeError, ValueError) as error:
+            raise ValueError("purchases debe ser un porcentaje numérico.") from error
+        minimum = 0 if field == "purchases" else -100
+        if not math.isfinite(change) or change < minimum or change > 100:
+            raise ValueError(f"{field} debe estar entre {minimum} y 100.")
+        return values
 
 class PredictRequest(BaseModel):
     householdId: str

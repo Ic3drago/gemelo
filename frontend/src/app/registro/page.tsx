@@ -1,21 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 import { Toast } from '@/design-system/Toast';
 import { Button } from '@/design-system/Button';
 import { Card } from '@/design-system/Card';
-import { ShoppingCart, Leaf, Zap, Save, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { EmptyState } from '@/design-system/EmptyState';
+import { SkeletonCard } from '@/design-system/Skeleton';
+import { ShoppingCart, Leaf, Zap, Save, CheckCircle2, AlertTriangle, ScanLine } from 'lucide-react';
 
-type Tab = 'compra' | 'alimento' | 'energia';
+type Tab = 'compra' | 'alimento' | 'energia' | 'escaneo';
 
 const PURCHASE_CATEGORIES = [
-  { id: 'supermercado', label: 'Supermercado' },
-  { id: 'mercado',      label: 'Mercado' },
-  { id: 'feria',        label: 'Feria' },
+  { id: 'alimentos', label: 'Alimentos' },
   { id: 'servicios',    label: 'Servicios' },
   { id: 'transporte',   label: 'Transporte' },
-  { id: 'otros',        label: 'Otros' },
+  { id: 'ocio', label: 'Ocio' },
+  { id: 'hogar', label: 'Hogar' },
 ];
 
 const FOOD_CATEGORIES = [
@@ -31,19 +33,33 @@ const FOOD_CATEGORIES = [
 const SUGGESTIONS = ['Arroz', 'Pollo', 'Papa', 'Cebolla', 'Tomate', 'Leche'];
 
 const CO2_PER_KWH = 0.5;
+type RecentPurchase = { id?: string; item?: string; category: string; amountBs?: number; timestamp?: string };
+type FoodReminderItem = { id: string; name: string; expiresAt: string };
 
 interface ToastState { message: string; type: 'success' | 'error' | 'info' | 'warning' }
 
 export default function RegistroPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('compra');
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [reminders, setReminders] = useState<FoodReminderItem[]>([]);
 
   // Compra form
-  const [compra, setCompra] = useState({ category: 'supermercado', item: '', amount: '', qty: '', unit: 'unidades' });
+  const [compra, setCompra] = useState({ category: 'alimentos', item: '', amount: '', qty: '', unit: 'unidades' });
   // Alimento form
   const [alimento, setAlimento] = useState({ name: '', category: 'verduras', qty: '' });
   // Energia form
   const [energia, setEnergia] = useState({ type: 'general', kwh: '' });
+
+  useEffect(() => {
+    Promise.all([api.getPurchases('householdId=hogar_001'), api.getFoodReminders('hogar_001')])
+      .then(([purchases, reminderData]) => {
+        setRecentPurchases(Array.isArray(purchases) ? (purchases as RecentPurchase[]).slice(0, 5) : []);
+        setReminders(Array.isArray(reminderData) ? reminderData as FoodReminderItem[] : []);
+      }).finally(() => setLoadingRecent(false));
+  }, []);
 
   const co2Preview = energia.kwh ? (Number(energia.kwh) * CO2_PER_KWH).toFixed(2) : null;
 
@@ -62,8 +78,9 @@ export default function RegistroPage() {
         unit: compra.unit,
       });
       if (!result) throw new Error('Purchase was not saved');
+      setRecentPurchases((current) => [{ item: compra.item, category: compra.category, amountBs: Number(compra.amount), timestamp: new Date().toISOString() }, ...current].slice(0, 5));
       showToast('Compra registrada. +5 pts', 'success');
-      setCompra({ category: 'supermercado', item: '', amount: '', qty: '', unit: 'unidades' });
+      setCompra({ category: 'alimentos', item: '', amount: '', qty: '', unit: 'unidades' });
     } catch {
       showToast('No se pudo registrar la compra', 'error');
     }
@@ -120,7 +137,7 @@ export default function RegistroPage() {
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'compra',   label: 'Compra',   icon: <ShoppingCart className="h-4 w-4" /> },
     { id: 'alimento', label: 'Alimento', icon: <Leaf className="h-4 w-4" /> },
-    { id: 'energia',  label: 'Energia',  icon: <Zap className="h-4 w-4" /> },
+    { id: 'escaneo', label: 'Escanear', icon: <ScanLine className="h-4 w-4" /> },
   ];
 
   return (
@@ -129,7 +146,7 @@ export default function RegistroPage() {
 
       <div>
         <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Registro manual</h1>
-        <p className="text-sm text-stone-500 mt-0.5">Alimenta tu gemelo digital con datos reales</p>
+        <p className="text-sm text-stone-500 mt-0.5 dark:text-stone-400">Alimenta tu gemelo digital con datos reales</p>
       </div>
 
       {/* Tab switcher */}
@@ -137,12 +154,12 @@ export default function RegistroPage() {
         {tabs.map(({ id, label, icon }) => (
           <button
             key={id}
-            onClick={() => setActiveTab(id)}
+            onClick={() => id === 'escaneo' ? router.push('/app/escaneo') : setActiveTab(id)}
             className={[
               'flex flex-1 items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors',
               activeTab === id
                 ? 'bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-50 shadow-sm'
-                : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300',
+                : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 dark:text-stone-400',
             ].join(' ')}
           >
             {icon}
@@ -153,7 +170,7 @@ export default function RegistroPage() {
 
       {/* ── Compra Form ── */}
       {activeTab === 'compra' && (
-        <Card variant="flat" className="animate-fade-in">
+        <Card variant="flat" className="animate-fade-in" data-tour="registration-form">
           <form onSubmit={handleCompraSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
@@ -168,7 +185,7 @@ export default function RegistroPage() {
                     className={[
                       'px-3 py-1.5 rounded-full text-sm font-medium border transition-colors',
                       compra.category === id
-                        ? 'bg-forest-600 text-white border-forest-600'
+                        ? 'bg-brand-700 text-white border-brand-700'
                         : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:border-forest-400',
                     ].join(' ')}
                   >
@@ -197,7 +214,7 @@ export default function RegistroPage() {
                     key={s}
                     type="button"
                     onClick={() => setCompra({ ...compra, item: s })}
-                    className="text-xs border border-stone-200 dark:border-stone-700 px-2.5 py-1 rounded-full text-stone-500 hover:text-forest-700 hover:border-forest-400 transition-colors"
+                    className="text-xs border border-stone-200 dark:border-stone-700 px-2.5 py-1 rounded-full text-stone-500 hover:text-forest-700 hover:border-forest-400 transition-colors dark:text-stone-400"
                   >
                     {s}
                   </button>
@@ -276,7 +293,7 @@ export default function RegistroPage() {
                     className={[
                       'px-3 py-1.5 rounded-full text-sm font-medium border transition-colors',
                       alimento.category === id
-                        ? 'bg-forest-600 text-white border-forest-600'
+                        ? 'bg-brand-700 text-white border-brand-700'
                         : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:border-forest-400',
                     ].join(' ')}
                   >
@@ -406,6 +423,14 @@ export default function RegistroPage() {
           </form>
         </Card>
       )}
+
+      <section className="space-y-3" aria-label="Últimas compras">
+        <h2 className="text-lg font-semibold">Últimas compras</h2>
+        {loadingRecent ? <SkeletonCard /> : recentPurchases.length ? <Card variant="flat" padding={false}>
+          {recentPurchases.map((purchase, index) => <div key={purchase.id ?? `${purchase.item}-${index}`} className="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-3 last:border-0 dark:border-stone-800"><div><p className="text-sm font-medium">{purchase.item ?? purchase.category}</p><p className="text-xs text-stone-500 dark:text-stone-400">{purchase.category} · {purchase.timestamp ? new Date(purchase.timestamp).toLocaleDateString('es-BO') : 'Historial'}</p></div><b className="shrink-0 text-sm nums">Bs {Number(purchase.amountBs ?? 0).toFixed(2)}</b></div>)}
+        </Card> : <EmptyState icon={<ShoppingCart />} title="Aún no hay compras" description="Las compras que registres aparecerán aquí." />}
+      </section>
+      {reminders.length > 0 && <section className="space-y-3" aria-label="Recordatorios de alimentos"><h2 className="text-lg font-semibold">Por vencer</h2><Card variant="flat" padding={false}>{reminders.map((reminder) => <div key={reminder.id} className="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-3 last:border-0 dark:border-stone-800"><span className="text-sm font-medium">{reminder.name}</span><span className="text-xs text-amber-800 dark:text-amber-300">{new Date(`${reminder.expiresAt}T12:00:00`).toLocaleDateString('es-BO')}</span></div>)}</Card></section>}
     </div>
   );
 }

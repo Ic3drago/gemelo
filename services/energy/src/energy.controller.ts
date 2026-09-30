@@ -31,6 +31,26 @@ export class EnergyController {
   }
 }
 
+@Controller('bills')
+export class BillsController {
+  constructor(private readonly service: EnergyService) {}
+
+  @Post('calculate')
+  calculate(@Body('kWh') kWh: number) {
+    return this.service.calculateBill(kWh);
+  }
+
+  @Post()
+  create(@Body() body: { kWh: number; month: string; householdId?: string }) {
+    return this.service.createBill(body);
+  }
+
+  @Get()
+  findAll(@Query('householdId') householdId?: string) {
+    return this.service.findBills(householdId);
+  }
+}
+
 @Controller()
 export class HealthController {
   @Get('health')

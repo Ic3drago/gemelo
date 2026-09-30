@@ -1,0 +1,26 @@
+# Only the Next.js app in ./frontend is deployed to Vercel.
+# Everything below is Docker/local-development only and is excluded to
+# keep uploads small (these trees contain node_modules and build output).
+
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+
+services
+gateway
+infra
+scripts
+
+docker-compose.yml
+**/Dockerfile
+**/docker-compose*.yml
+**/.dockerignore
+
+.env.local
+.env.*.local
+*.log
+.DS_Store
+README.md

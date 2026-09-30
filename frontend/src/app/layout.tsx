@@ -1,16 +1,50 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import Navigation from '@/components/Navigation';
+import AppShell from '@/components/AppShell';
+import { themeNoFlashScript } from '@/lib/theme';
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://gemelo-digital.vercel.app';
 
 export const metadata: Metadata = {
-  title: 'Gemelo Digital | Consumo Responsable',
-  description: 'Optimiza el consumo de tu hogar con datos reales y predicciones inteligentes.',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'Gemelo Digital | Consumo Responsable del Hogar',
+    template: '%s | Gemelo Digital',
+  },
+  description:
+    'Observa, proyecta y simula el consumo doméstico de tu hogar: compras, energía, desperdicio, finanzas y huella de carbono. Alineado con el ODS 12.',
+  keywords: [
+    'consumo responsable',
+    'ODS 12',
+    'eficiencia energética',
+    'huella de carbono',
+    'presupuesto familiar',
+    'gemelo digital',
+    'sostenibilidad',
+  ],
   manifest: '/manifest.json',
+  applicationName: 'Gemelo Digital',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'Gemelo Digital',
   },
+  openGraph: {
+    type: 'website',
+    url: SITE_URL,
+    siteName: 'Gemelo Digital',
+    title: 'Gemelo Digital | Consumo Responsable del Hogar',
+    description:
+      'Registra, proyecta y simula el consumo de tu hogar con datos reales y predicciones explicables.',
+    locale: 'es_BO',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Gemelo Digital | Consumo Responsable del Hogar',
+    description:
+      'Registra, proyecta y simula el consumo de tu hogar con datos reales y predicciones explicables.',
+  },
+  robots: { index: true, follow: true },
   other: {
     'mobile-web-app-capable': 'yes',
   },
@@ -21,27 +55,22 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#faf8f4' },
+    { media: '(prefers-color-scheme: light)', color: '#EDF0EC' },
     { media: '(prefers-color-scheme: dark)', color: '#0c0a09' },
   ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className="">
+    <html lang="es" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href="/icons/icon.svg" />
+        {/* Applies the saved theme before first paint, avoiding the flash of
+            light UI followed by a switch to dark. */}
+        <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
       </head>
       <body className="antialiased bg-[var(--bg)] text-[var(--text)]">
-        <div className="flex min-h-screen min-h-dvh">
-          <Navigation />
-          <main
-            id="main-content"
-            className="flex-1 md:ml-[240px] px-4 py-6 md:px-8 md:py-8 pb-28 md:pb-8 max-w-5xl w-full transition-all"
-          >
-            {children}
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

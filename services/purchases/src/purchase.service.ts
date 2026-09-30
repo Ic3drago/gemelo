@@ -18,14 +18,23 @@ export class PurchaseService {
    * y cálculo de CO₂) dentro de la entidad, y publica el evento de dominio.
    */
   async create(data: Partial<Purchase>): Promise<Purchase> {
+    const amountBs = Number(data.amountBs);
+    if (!Number.isFinite(amountBs) || amountBs <= 0) {
+      throw new BadRequestException('El monto de la compra debe ser mayor que cero.');
+    }
+    if (data.quantity !== undefined && (!Number.isFinite(Number(data.quantity)) || Number(data.quantity) <= 0)) {
+      throw new BadRequestException('La cantidad de compra debe ser mayor que cero.');
+    }
+
     // Validar la categoría a través del value object antes de persistir
+    let category: PurchaseCategory;
     try {
-      PurchaseCategory.of(data.category ?? '');
+      category = PurchaseCategory.of(data.category ?? '');
     } catch (e) {
       throw new BadRequestException(e.message);
     }
 
-    const purchase = this.repository.create(data);
+    const purchase = this.repository.create({ ...data, category: category.value, amountBs });
 
     // Comportamiento de dominio: la entidad calcula su propia huella de CO₂
     purchase.applyCarbon();

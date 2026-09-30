@@ -7,12 +7,13 @@ import { api } from '@/lib/api';
 import { Card } from '@/design-system/Card';
 import { Button } from '@/design-system/Button';
 import { BottomSheet } from '@/design-system/BottomSheet';
+import { EmptyState } from '@/design-system/EmptyState';
 import { SkeletonCard } from '@/design-system/Skeleton';
 import { Badge } from '@/design-system/Badge';
 import { Toast } from '@/design-system/Toast';
 
 interface BudgetRule { label: string; target: number; spent: number; color: string; badgeVariant: 'info' | 'warning' | 'success' }
-interface Goal { id: string; name: string; target: number; current: number }
+interface Goal { id: string; name: string; target: number; current: number; weeklyContribution: number }
 interface Tx { id: string; description: string; amount: number; date: string; type: 'income' | 'expense' }
 interface Account { id: string; name: string; balance: number }
 
@@ -24,19 +25,21 @@ interface FinancesData {
   accounts: Account[];
 }
 
-const pct = (spent: number, target: number) => Math.min(100, Math.round((spent / target) * 100));
+const pct = (spent: number, target: number) => target > 0 ? Math.min(100, Math.round((spent / target) * 100)) : 0;
 
 async function loadFinancesData(): Promise<FinancesData> {
-  const [accountsRaw, transactionsRaw, goalsRaw, budgetsRaw] = await Promise.all([
+  const [accountsRaw, transactionsRaw, goalsRaw, budgetsRaw, householdBudgetRaw] = await Promise.all([
     api.getAccounts(),
     api.getTransactions(),
     api.getGoals(),
     api.getBudgets(),
+    api.getHouseholdBudget(),
   ]);
   const accounts = Array.isArray(accountsRaw) ? accountsRaw as any[] : [];
   const transactions = Array.isArray(transactionsRaw) ? transactionsRaw as any[] : [];
   const goals = Array.isArray(goalsRaw) ? goalsRaw as any[] : [];
   const budgets = Array.isArray(budgetsRaw) ? budgetsRaw as any[] : [];
+  const householdBudget = householdBudgetRaw as any;
   const month = new Date().toISOString().slice(0, 7);
   const monthTransactions = transactions.filter((tx) => String(tx.timestamp ?? '').startsWith(month));
   const budget = budgets.find((item) => item.month === month);
@@ -44,20 +47,23 @@ async function loadFinancesData(): Promise<FinancesData> {
     .filter((tx) => tx.type === 'expense' && String(tx.category).toLowerCase() === category)
     .reduce((total, tx) => total + Number(tx.amount), 0);
 
-  return {
-    income: monthTransactions
+  const transactionIncome = monthTransactions
       .filter((tx) => tx.type === 'income')
-      .reduce((total, tx) => total + Number(tx.amount), 0),
-    rules: budget ? [
-      { label: 'Necesidades', target: Number(budget.needsLimit), spent: spentFor('needs'), color: '#0284c7', badgeVariant: 'info' },
-      { label: 'Deseos', target: Number(budget.wantsLimit), spent: spentFor('wants'), color: '#d97706', badgeVariant: 'warning' },
-      { label: 'Ahorro', target: Number(budget.savingsTarget), spent: spentFor('savings'), color: '#16a34a', badgeVariant: 'success' },
-    ] : [],
+      .reduce((total, tx) => total + Number(tx.amount), 0);
+  const income = Number(householdBudget?.income ?? transactionIncome);
+  return {
+    income,
+    rules: [
+      { label: 'Necesidades', target: income > 0 ? income * 0.5 : Number(budget?.needsLimit ?? 0), spent: spentFor('needs'), color: '#3E7CB1', badgeVariant: 'info' },
+      { label: 'Deseos', target: income > 0 ? income * 0.3 : Number(budget?.wantsLimit ?? 0), spent: spentFor('wants') + spentFor('ocio'), color: '#C9822B', badgeVariant: 'warning' },
+      { label: 'Ahorro', target: income > 0 ? income * 0.2 : Number(budget?.savingsTarget ?? 0), spent: spentFor('savings'), color: '#6FA35B', badgeVariant: 'success' },
+    ],
     goals: goals.map((goal) => ({
       id: String(goal.id),
       name: goal.name,
       target: Number(goal.targetAmount),
       current: Number(goal.currentAmount),
+      weeklyContribution: Number(goal.suggestedWeeklyContribution ?? 0),
     })),
     recentTx: transactions.slice(0, 5).map((tx) => ({
       id: String(tx.id),
@@ -81,8 +87,8 @@ export default function PresupuestoPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const [txForm, setTxForm] = useState({ description: '', amount: '', type: 'expense' as 'income' | 'expense', category: 'needs', accountId: '' });
-  const [goalForm, setGoalForm] = useState({ name: '', target: '' });
-  const [budgetForm, setBudgetForm] = useState({ needs: '', wants: '', savings: '' });
+  const [goalForm, setGoalForm] = useState({ name: '', target: '', targetDate: '' });
+  const [budgetForm, setBudgetForm] = useState({ income: '' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -119,7 +125,7 @@ export default function PresupuestoPage() {
   const handleAddGoal = async () => {
     if (!goalForm.name.trim() || Number(goalForm.target) <= 0) return;
     setSaving(true);
-    const result = await api.createGoal({ name: goalForm.name.trim(), targetAmount: Number(goalForm.target) });
+    const result = await api.createGoal({ name: goalForm.name.trim(), targetAmount: Number(goalForm.target), targetDate: goalForm.targetDate || undefined });
     if (!result) {
       setToast({ message: 'No se pudo crear la meta', type: 'error' });
       setSaving(false);
@@ -128,31 +134,24 @@ export default function PresupuestoPage() {
     setData(await loadFinancesData());
     setToast({ message: 'Meta creada', type: 'success' });
     setActiveSheet(null);
-    setGoalForm({ name: '', target: '' });
+    setGoalForm({ name: '', target: '', targetDate: '' });
     setSaving(false);
   };
 
   const handleCreateBudget = async () => {
-    const needsLimit = Number(budgetForm.needs);
-    const wantsLimit = Number(budgetForm.wants);
-    const savingsTarget = Number(budgetForm.savings);
-    if ([needsLimit, wantsLimit, savingsTarget].some((amount) => amount <= 0)) return;
+    const income = Number(budgetForm.income);
+    if (!Number.isFinite(income) || income <= 0) return;
     setSaving(true);
-    const result = await api.createBudget({
-      month: new Date().toISOString().slice(0, 7),
-      needsLimit,
-      wantsLimit,
-      savingsTarget,
-    });
+    const result = await api.setHouseholdBudget({ householdId: 'hogar_001', income });
     if (!result) {
       setToast({ message: 'No se pudo guardar el presupuesto', type: 'error' });
       setSaving(false);
       return;
     }
     setData(await loadFinancesData());
-    setToast({ message: 'Presupuesto mensual guardado', type: 'success' });
+    setToast({ message: 'Ingreso mensual guardado; límites 50/30/20 actualizados.', type: 'success' });
     setActiveSheet(null);
-    setBudgetForm({ needs: '', wants: '', savings: '' });
+    setBudgetForm({ income: '' });
     setSaving(false);
   };
 
@@ -166,7 +165,7 @@ export default function PresupuestoPage() {
     );
   }
 
-  if (!data) return null;
+  if (!data) return <EmptyState icon={<Wallet />} title="No se pudo cargar el presupuesto" description="Revisa la conexión e inténtalo de nuevo." action={{ label: 'Reintentar', onClick: () => window.location.reload() }} />;
 
   const radialData = data.rules.map((r) => ({
     name: r.label,
@@ -181,7 +180,7 @@ export default function PresupuestoPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Mi Presupuesto</h1>
-          <p className="text-sm text-stone-500 mt-0.5">Regla 50/30/20</p>
+          <p className="text-sm text-stone-500 mt-0.5 dark:text-stone-400">Regla 50/30/20</p>
         </div>
         <Button
           variant="primary"
@@ -191,11 +190,12 @@ export default function PresupuestoPage() {
         >
           Agregar
         </Button>
+        <Button variant="secondary" size="sm" onClick={() => { setBudgetForm({ income: String(data.income || '') }); setActiveSheet('budget'); }}>Ingreso</Button>
       </div>
 
       {/* ── 50/30/20 Overview ── */}
       <Card variant="flat" padding={false}>
-        {data.rules.length > 0 ? <div className="flex flex-col md:flex-row items-center gap-4 p-5">
+        {data.income > 0 ? <div className="flex flex-col md:flex-row items-center gap-4 p-5">
           {/* Radial chart */}
           <div className="w-40 h-40 shrink-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -223,7 +223,7 @@ export default function PresupuestoPage() {
                       <span className="text-sm font-medium text-stone-700 dark:text-stone-300">{rule.label}</span>
                       {over && <Badge variant="danger">Excedido</Badge>}
                     </div>
-                    <span className="text-xs text-stone-400 nums">
+                    <span className="text-xs text-stone-400 nums dark:text-stone-500">
                       Bs {rule.spent.toLocaleString('es-BO')} / {rule.target.toLocaleString('es-BO')}
                     </span>
                   </div>
@@ -238,26 +238,26 @@ export default function PresupuestoPage() {
             })}
           </div>
         </div> : <div className="p-5 flex items-center justify-between gap-4">
-          <p className="text-sm text-stone-500">Todavia no hay un presupuesto mensual registrado.</p>
-          <Button variant="secondary" size="sm" onClick={() => setActiveSheet('budget')}>Configurar</Button>
+          <p className="text-sm text-stone-500 dark:text-stone-400">Configura el ingreso para calcular tu regla 50/30/20.</p>
+          <Button variant="secondary" size="sm" onClick={() => { setBudgetForm({ income: '' }); setActiveSheet('budget'); }}>Configurar</Button>
         </div>}
       </Card>
 
       {/* ── Metas ── */}
       <Card variant="flat">
         <div className="flex items-center gap-2 mb-4">
-          <Target className="h-5 w-5 text-forest-600" />
+          <Target className="h-5 w-5 text-forest-600 dark:text-forest-400" />
           <h2 className="text-base font-semibold text-stone-800 dark:text-stone-100">Metas de ahorro</h2>
         </div>
         <div className="space-y-4">
-          {data.goals.length === 0 && <p className="text-sm text-stone-500">Aun no tienes metas de ahorro.</p>}
+          {data.goals.length === 0 && <p className="text-sm text-stone-500 dark:text-stone-400">Aun no tienes metas de ahorro.</p>}
           {data.goals.map((goal) => {
             const p = pct(goal.current, goal.target);
             return (
               <div key={goal.id}>
                 <div className="flex justify-between items-center mb-1.5">
                   <span className="text-sm font-medium text-stone-700 dark:text-stone-300">{goal.name}</span>
-                  <span className="text-sm font-semibold text-forest-600">{p}%</span>
+                  <span className="text-sm font-semibold text-forest-600 dark:text-forest-400">{p}%</span>
                 </div>
                 <div className="h-2.5 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
                   <div
@@ -265,14 +265,15 @@ export default function PresupuestoPage() {
                     style={{ width: `${p}%` }}
                   />
                 </div>
-                <p className="text-xs text-stone-400 mt-1 text-right nums">
+                <p className="text-xs text-stone-400 mt-1 text-right nums dark:text-stone-500">
                   Bs {goal.current.toLocaleString('es-BO')} de Bs {goal.target.toLocaleString('es-BO')}
                 </p>
+                <p className="mt-1 text-xs text-forest-700 dark:text-forest-300">Aporte sugerido: Bs {goal.weeklyContribution.toLocaleString('es-BO')} por semana</p>
               </div>
             );
           })}
           <button
-            className="w-full h-11 border-2 border-dashed border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-500 hover:text-forest-600 hover:border-forest-400 transition-colors"
+            className="w-full h-11 border-2 border-dashed border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-500 hover:text-forest-600 hover:border-forest-400 transition-colors dark:text-stone-400"
             onClick={() => setActiveSheet('goal')}
           >
             Crear nueva meta
@@ -284,7 +285,7 @@ export default function PresupuestoPage() {
       {data.recentTx.length > 0 && (
         <Card variant="flat">
           <div className="flex items-center gap-2 mb-4">
-            <Wallet className="h-5 w-5 text-forest-600" />
+            <Wallet className="h-5 w-5 text-forest-600 dark:text-forest-400" />
             <h2 className="text-base font-semibold text-stone-800 dark:text-stone-100">Transacciones recientes</h2>
           </div>
           <div className="divide-y divide-stone-100 dark:divide-stone-800">
@@ -292,7 +293,7 @@ export default function PresupuestoPage() {
               <div key={tx.id} className="flex justify-between items-center py-3">
                 <div>
                   <p className="text-sm font-medium text-stone-700 dark:text-stone-300">{tx.description}</p>
-                  <p className="text-xs text-stone-400">{new Date(tx.date).toLocaleDateString('es-BO')}</p>
+                  <p className="text-xs text-stone-400 dark:text-stone-500">{new Date(tx.date).toLocaleDateString('es-BO')}</p>
                 </div>
                 <span className={['text-sm font-semibold nums', tx.type === 'income' ? 'text-forest-600' : 'text-stone-700 dark:text-stone-300'].join(' ')}>
                   {tx.type === 'income' ? '+' : '-'}Bs {Math.abs(tx.amount).toLocaleString('es-BO')}
@@ -315,20 +316,19 @@ export default function PresupuestoPage() {
               Monto objetivo (Bs)
               <input type="number" min="0.01" step="0.01" className="input-base mt-1.5" value={goalForm.target} onChange={(e) => setGoalForm({ ...goalForm, target: e.target.value })} />
             </label>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
+              Fecha objetivo
+              <input type="date" className="input-base mt-1.5" value={goalForm.targetDate} onChange={(e) => setGoalForm({ ...goalForm, targetDate: e.target.value })} />
+            </label>
             <Button variant="primary" size="md" fullWidth loading={saving} onClick={handleAddGoal}>Crear meta</Button>
           </div>
         ) : activeSheet === 'budget' ? (
           <div className="space-y-4">
-            {([
-              ['needs', 'Limite de necesidades'],
-              ['wants', 'Limite de deseos'],
-              ['savings', 'Meta de ahorro'],
-            ] as const).map(([key, label]) => (
-              <label key={key} className="block text-sm font-medium text-stone-700 dark:text-stone-300">
-                {label} (Bs)
-                <input type="number" min="0.01" step="0.01" className="input-base mt-1.5" value={budgetForm[key]} onChange={(e) => setBudgetForm({ ...budgetForm, [key]: e.target.value })} />
-              </label>
-            ))}
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
+              Ingreso mensual (Bs)
+              <input type="number" min="0.01" step="0.01" className="input-base mt-1.5" value={budgetForm.income} onChange={(e) => setBudgetForm({ income: e.target.value })} />
+            </label>
+            {Number(budgetForm.income) > 0 && <p className="text-xs text-stone-500 dark:text-stone-400">Necesidades Bs {(Number(budgetForm.income) * 0.5).toFixed(2)} · Deseos Bs {(Number(budgetForm.income) * 0.3).toFixed(2)} · Ahorro Bs {(Number(budgetForm.income) * 0.2).toFixed(2)}</p>}
             <Button variant="primary" size="md" fullWidth loading={saving} onClick={handleCreateBudget}>Guardar presupuesto</Button>
           </div>
         ) : (

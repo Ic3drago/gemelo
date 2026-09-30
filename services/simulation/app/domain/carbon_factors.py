@@ -16,24 +16,31 @@ de factor (p.ej. actualización del mix eléctrico) se hace en un único lugar.
 class CarbonFactors:
     # ── Energía ───────────────────────────────────────────────────────────────
 
-    #: kg CO₂ emitidos por cada kWh consumido (mix eléctrico venezolano estimado)
+    #: Estimación referencial de kg CO₂ por kWh consumido; no es un factor oficial.
     KG_CO2_PER_KWH: float = 0.5
 
-    #: Bs ahorrados por cada kWh reducido (tarifa residencial base)
-    BS_SAVINGS_PER_KWH: float = 0.89
+    #: Estimación referencial de ahorro por kg de alimento no desperdiciado.
+    BS_SAVINGS_PER_KG_WASTE: float = 20.0
 
     # ── Alimentos desperdiciados ──────────────────────────────────────────────
 
     #: kg CO₂ emitidos por cada kg de alimento desperdiciado (ciclo de vida)
     KG_CO2_PER_KG_WASTE: float = 2.5
 
-    #: Bs ahorrados por cada kg de desperdicio evitado (costo promedio alimento)
-    BS_SAVINGS_PER_KG_WASTE: float = 15.0
-
     # ── Compras ───────────────────────────────────────────────────────────────
 
     #: kg CO₂ emitidos por cada Bs de compra (factor de emisión de consumo)
     KG_CO2_PER_BS_PURCHASE: float = 0.01
+
+    # Tarifa residencial referencial editable. No representa una tarifa oficial.
+    ELECTRICITY_TIERS: tuple[tuple[float | None, float], ...] = (
+        (30.0, 0.75),
+        (100.0, 0.89),
+        (200.0, 1.00),
+        (None, 1.15),
+    )
+    ELECTRICITY_FIXED_CHARGE_BS: float = 5.0
+    PUBLIC_LIGHTING_RATE: float = 0.06
 
     # ── Métodos de cálculo ────────────────────────────────────────────────────
 
@@ -59,4 +66,27 @@ class CarbonFactors:
             cls.co2_from_purchases(purchases_bs)
             + cls.co2_from_energy(energy_kwh)
             + cls.co2_from_waste(waste_kg)
+        )
+
+    @classmethod
+    def electricity_bill(cls, kwh: float) -> float:
+        """Calcula una factura referencial aplicando los tramos progresivos."""
+        if kwh < 0:
+            raise ValueError("El consumo de energía no puede ser negativo.")
+        remaining = kwh
+        tiered_charge = 0.0
+        previous_limit = 0.0
+        for limit, rate in cls.ELECTRICITY_TIERS:
+            tier_size = remaining if limit is None else min(remaining, limit - previous_limit)
+            tiered_charge += max(0.0, tier_size) * rate
+            remaining -= max(0.0, tier_size)
+            if limit is not None:
+                previous_limit = limit
+            if remaining <= 0:
+                break
+        return round(
+            tiered_charge
+            + cls.ELECTRICITY_FIXED_CHARGE_BS
+            + tiered_charge * cls.PUBLIC_LIGHTING_RATE,
+            2,
         )

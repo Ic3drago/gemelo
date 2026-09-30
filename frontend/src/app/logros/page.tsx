@@ -15,7 +15,10 @@ interface Profile {
   level: number;
   levelName: string;
   progress: number;
+  pointsToNextLevel: number;
 }
+
+interface RankingEntry { householdId: string; points: number; level: number; levelName: string }
 
 interface Achievement {
   id: string;
@@ -55,20 +58,23 @@ export default function LogrosPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [profRaw, achRaw, histRaw] = await Promise.all([
+        const [profRaw, achRaw, histRaw, rankingRaw] = await Promise.all([
           api.getProfile('hogar_001'),
           api.getAchievements('hogar_001'),
           api.getPointsHistory('hogar_001'),
+          api.getLeaderboard(),
         ]);
 
         const profData = profRaw as any;
         const achData = achRaw as any;
         const histData = histRaw as any;
+        const rankingData = rankingRaw as any;
 
         if (!profData) {
           setProfile(null);
@@ -83,7 +89,9 @@ export default function LogrosPage() {
           level: Number(profData.level ?? 1),
           levelName: profData.levelName ?? 'Principiante',
           progress: profData.progress ?? getLevelProgress(Number(profData.points ?? 0), Number(profData.level ?? 1)),
+          pointsToNextLevel: Number(profData.pointsToNextLevel ?? 0),
         });
+        setRanking(Array.isArray(rankingData) ? rankingData : []);
 
         setAchievements(
           Array.isArray(achData)
@@ -139,14 +147,14 @@ export default function LogrosPage() {
     <div className="space-y-5 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Mis Logros</h1>
-        <p className="text-sm text-stone-500 mt-0.5">Tu impacto positivo se recompensa</p>
+        <p className="text-sm text-stone-500 mt-0.5 dark:text-stone-400">Tu impacto positivo se recompensa</p>
       </div>
 
       {/* ── Profile card ── */}
-      <Card variant="flat">
+      <Card variant="flat" data-tour="achievement-profile">
         <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center justify-between">
           <div>
-            <p className="text-sm text-stone-500">{profile.name}</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400">{profile.name}</p>
             <div className="flex items-center gap-2 mt-1">
               <h2 className="text-xl font-bold text-stone-900 dark:text-stone-50">{profile.levelName}</h2>
               <Badge variant={levelBadgeVariant}>Nivel {profile.level}</Badge>
@@ -160,7 +168,7 @@ export default function LogrosPage() {
         </div>
 
         <div className="mt-5">
-          <div className="flex justify-between text-xs text-stone-500 mb-1.5">
+          <div className="flex justify-between text-xs text-stone-500 mb-1.5 dark:text-stone-400">
             <span>Progreso al nivel {profile.level + 1}</span>
             <span className="nums">{profile.progress}%</span>
           </div>
@@ -171,6 +179,12 @@ export default function LogrosPage() {
             />
           </div>
         </div>
+        <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">{profile.pointsToNextLevel > 0 ? `Te faltan ${profile.pointsToNextLevel} puntos para el siguiente nivel.` : 'Ya alcanzaste el nivel máximo.'}</p>
+      </Card>
+
+      <Card variant="flat">
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold">Clasificación</h2><Badge variant="info">Top {ranking.length}</Badge></div>
+        {ranking.length ? <ol className="divide-y divide-stone-100 dark:divide-stone-800">{ranking.map((entry, index) => <li key={entry.householdId} className="flex items-center justify-between gap-3 py-3"><div className="flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-full bg-forest-50 text-xs font-bold text-forest-800 dark:bg-forest-950 dark:text-forest-200">{index + 1}</span><div><p className="text-sm font-semibold">{entry.householdId === 'hogar_001' ? 'Mi hogar' : entry.householdId}</p><p className="text-xs text-stone-500 dark:text-stone-400">{entry.levelName}</p></div></div><b className="text-sm nums">{entry.points} pts</b></li>)}</ol> : <EmptyState icon={<Trophy />} title="Aún no hay clasificación" description="Registra actividades para aparecer en el ranking." />}
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -195,13 +209,13 @@ export default function LogrosPage() {
                   'w-12 h-12 rounded-xl flex items-center justify-center',
                   ach.unlocked
                     ? 'bg-forest-50 dark:bg-forest-950 text-forest-600 dark:text-forest-400'
-                    : 'bg-stone-100 dark:bg-stone-800 text-stone-400',
+                    : 'bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500',
                 ].join(' ')}>
                   {ach.unlocked ? getAchievementIcon(ach.name) : <Lock className="h-5 w-5" />}
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-stone-800 dark:text-stone-100 leading-tight">{ach.name}</p>
-                  <p className="text-[11px] text-stone-400 mt-0.5 leading-tight">{ach.description}</p>
+                  <p className="text-[11px] text-stone-400 mt-0.5 leading-tight dark:text-stone-500">{ach.description}</p>
                 </div>
               </Card>
             ))}
@@ -211,18 +225,18 @@ export default function LogrosPage() {
         {/* ── Points history ── */}
         <Card variant="flat">
           <div className="flex items-center gap-2 mb-4">
-            <Clock className="h-4 w-4 text-stone-400" />
+            <Clock className="h-4 w-4 text-stone-400 dark:text-stone-500" />
             <h2 className="text-sm font-semibold text-stone-700 dark:text-stone-300">Historial</h2>
           </div>
           {history.length === 0 ? (
-            <p className="text-sm text-stone-400 text-center py-6">Sin actividad reciente</p>
+            <p className="text-sm text-stone-400 text-center py-6 dark:text-stone-500">Sin actividad reciente</p>
           ) : (
             <div className="divide-y divide-stone-100 dark:divide-stone-800">
               {history.map((item) => (
                 <div key={item.id} className="flex justify-between items-start py-3">
                   <div className="pr-3 min-w-0">
                     <p className="text-sm text-stone-700 dark:text-stone-300 font-medium truncate">{item.action}</p>
-                    <p className="text-xs text-stone-400 mt-0.5">{item.time}</p>
+                    <p className="text-xs text-stone-400 mt-0.5 dark:text-stone-500">{item.time}</p>
                   </div>
                   <Badge variant={item.points >= 0 ? 'success' : 'danger'}>
                     {item.points >= 0 ? '+' : ''}{item.points} pts

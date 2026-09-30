@@ -20,6 +20,11 @@ export class GamificationController {
     return this.gamificationService.getPointsHistory(householdId);
   }
 
+  @Get('gamification/leaderboard')
+  getLeaderboard() {
+    return this.gamificationService.getLeaderboard();
+  }
+
   @Get('health')
   getHealth() {
     return { status: 'ok', service: 'gamification-svc' };

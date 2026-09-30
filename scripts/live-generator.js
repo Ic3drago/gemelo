@@ -29,7 +29,17 @@ async function run() {
     await new Promise(r => setTimeout(r, waitTime));
 
     const rand = Math.random();
-    if (rand < 0.4) {
+    if (rand < 0.025) {
+      const now = new Date();
+      const month = now.toISOString().slice(0, 7);
+      const kWh = 180 + Math.random() * 100;
+      await fetch(`${API_URL}/bills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ householdId, month, kWh })
+      });
+      console.log(`[${now.toISOString()}] Emitted electricity bill: ${kWh.toFixed(1)} kWh`);
+    } else if (rand < 0.4) {
       // Purchase
       const prod = products[Math.floor(Math.random() * products.length)];
       await fetch(`${API_URL}/purchases`, {

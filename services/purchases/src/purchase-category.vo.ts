@@ -7,19 +7,18 @@
  */
 export class PurchaseCategory {
   static readonly VALID_CATEGORIES = [
-    'mercado',
-    'supermercado',
-    'feria',
+    'alimentos',
     'servicios',
     'transporte',
-    'carnes',
-    'verduras',
-    'lacteos',
-    'panaderia',
-    'limpieza',
-    'snacks',
-    'otros',
+    'ocio',
+    'hogar',
   ] as const;
+
+  private static readonly LEGACY_CATEGORIES: Record<string, string> = {
+    mercado: 'alimentos', supermercado: 'alimentos', feria: 'alimentos', carnes: 'alimentos',
+    verduras: 'alimentos', lacteos: 'alimentos', panaderia: 'alimentos', limpieza: 'hogar',
+    snacks: 'ocio', otros: 'hogar',
+  };
 
   /**
    * kg CO₂ por cada Bs gastado, estimado por categoría de compra.
@@ -38,12 +37,16 @@ export class PurchaseCategory {
     limpieza:     0.007,
     snacks:       0.012,
     otros:        0.010,
+    alimentos:    0.008,
+    ocio:         0.010,
+    hogar:        0.007,
   };
 
   private constructor(readonly value: string) {}
 
   static of(value: string): PurchaseCategory {
-    const normalized = value?.toLowerCase().trim();
+    const raw = value?.toLowerCase().trim();
+    const normalized = PurchaseCategory.LEGACY_CATEGORIES[raw] ?? raw;
     if (!PurchaseCategory.VALID_CATEGORIES.includes(normalized as any)) {
       throw new Error(
         `Categoría de compra inválida: "${value}". ` +

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Food } from './food.entity';
+import { FoodReminder } from './food-reminder.entity';
 import { FoodStatus } from './food-status.vo';
 import { RabbitMQService } from './rabbitmq.service';
 
@@ -10,11 +11,24 @@ export class FoodService {
   constructor(
     @InjectRepository(Food)
     private readonly foodRepo: Repository<Food>,
+    @InjectRepository(FoodReminder)
+    private readonly reminderRepo: Repository<FoodReminder>,
     private readonly rabbitmq: RabbitMQService,
   ) {}
 
   async create(data: Partial<Food>): Promise<Food> {
-    const food = this.foodRepo.create({ ...data, status: 'stored' });
+    const quantityKg = Number(data.quantityKg);
+    if (!Number.isFinite(quantityKg) || quantityKg <= 0) {
+      throw new BadRequestException('La cantidad de alimento debe ser mayor que cero.');
+    }
+    if (!data.name?.trim() || !data.category?.trim()) {
+      throw new BadRequestException('El alimento requiere nombre y categoría.');
+    }
+    const createdAt = data.createdAt ? new Date(String(data.createdAt)) : undefined;
+    if (createdAt && Number.isNaN(createdAt.getTime())) {
+      throw new BadRequestException('La fecha de registro no es válida.');
+    }
+    const food = this.foodRepo.create({ ...data, createdAt, updatedAt: createdAt ?? new Date(), quantityKg, status: 'stored' });
     return this.foodRepo.save(food);
   }
 
@@ -30,7 +44,7 @@ export class FoodService {
    * (validación de transición + cálculo de CO₂) a la entidad Food.
    * El service solo orquesta: persiste y publica el evento de dominio.
    */
-  async updateStatus(id: string, rawStatus: string): Promise<Food> {
+  async updateStatus(id: string, rawStatus: string, occurredAt?: string): Promise<Food> {
     const food = await this.foodRepo.findOne({ where: { id } });
     if (!food) {
       throw new NotFoundException(`Alimento con id ${id} no encontrado`);
@@ -50,6 +64,15 @@ export class FoodService {
     } catch (e) {
       throw new BadRequestException(e.message);
     }
+
+    let eventDate = new Date();
+    if (occurredAt) {
+      eventDate = new Date(occurredAt);
+      if (Number.isNaN(eventDate.getTime())) {
+        throw new BadRequestException('La fecha de transición no es válida.');
+      }
+    }
+    food.updatedAt = eventDate;
 
     const saved = await this.foodRepo.save(food);
 
@@ -106,5 +129,26 @@ export class FoodService {
     );
 
     return { summary, totalWasteKg, totalWasteCo2 };
+  }
+
+  async createReminder(data: Partial<FoodReminder>): Promise<FoodReminder> {
+    const expiresAt = new Date(String(data.expiresAt ?? ''));
+    if (!data.name?.trim() || Number.isNaN(expiresAt.getTime())) {
+      throw new BadRequestException('El recordatorio requiere nombre y fecha de vencimiento válida.');
+    }
+    if (expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException('La fecha estimada debe ser futura.');
+    }
+    return this.reminderRepo.save(this.reminderRepo.create({
+      ...data,
+      householdId: data.householdId || 'hogar_001',
+      name: data.name.trim(),
+      expiresAt: expiresAt.toISOString().slice(0, 10),
+      status: 'pending',
+    }));
+  }
+
+  getReminders(householdId = 'hogar_001'): Promise<FoodReminder[]> {
+    return this.reminderRepo.find({ where: { householdId, status: 'pending' }, order: { expiresAt: 'ASC' } });
   }
 }

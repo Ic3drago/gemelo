@@ -1,368 +1,605 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts';
-import {
-  ShoppingCart, ScanLine, TrendingUp, Leaf, Zap, Trash2,
-  ChevronRight, Star,
+  Check,
+  ChevronRight,
+  Coins,
+  Leaf,
+  LineChart,
+  Lightbulb,
+  PiggyBank,
+  ScanLine,
+  ShoppingCart,
+  Sparkles,
+  Target,
+  Trash2,
+  Trophy,
+  Zap,
 } from 'lucide-react';
-import { Card } from '@/design-system/Card';
-import { Stat } from '@/design-system/Stat';
-import { SkeletonCard } from '@/design-system/Skeleton';
-import { EmptyState } from '@/design-system/EmptyState';
-import { Button } from '@/design-system/Button';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { countUpAll, float, heroIntro, revealOnScroll, scrollProgress, tiltOnHover } from '@/lib/animations';
 
-type Status = 'green' | 'amber' | 'red' | 'none';
-
-interface DashboardData {
-  status: Status;
-  remainingBudget: number;
-  totalBudget: number;
-  spentBudget: number;
-  monthLabel: string;
-  stats: {
-    spent: number;
-    co2: number;
-    waste: number;
-    energy: number;
-  };
-  trend: Array<{ month: string; amount: number }>;
-  gamification: {
-    points: number;
-    level: number;
-    levelName: string;
-    progress: number;
-  };
-}
-
-const statusConfig: Record<Status, { label: string; bg: string; ring: string; text: string }> = {
-  green: {
-    label: 'Buen ritmo',
-    bg: 'bg-forest-500',
-    ring: 'ring-forest-200',
-    text: 'text-forest-700',
+const MODULES = [
+  {
+    icon: ShoppingCart,
+    title: 'Compras',
+    body: 'Registra cada compra con categoría, monto y huella estimada. El sistema agrupa el gasto mensual y detecta en qué se te va.',
+    tag: 'Bs por categoría',
   },
-  amber: {
-    label: 'Precaucion',
-    bg: 'bg-amber-500',
-    ring: 'ring-amber-200',
-    text: 'text-amber-700',
+  {
+    icon: Zap,
+    title: 'Energía',
+    body: 'Carga lecturas mensuales en kWh, calcula el monto por tramos y compara contra el promedio del hogar.',
+    tag: 'kWh · Bs · CO₂',
   },
-  red: {
-    label: 'Alerta',
-    bg: 'bg-rose-500',
-    ring: 'ring-rose-200',
-    text: 'text-rose-700',
+  {
+    icon: Trash2,
+    title: 'Alimentos',
+    body: 'Controla qué tienes almacenado, marca lo que consumes o desechas y recibe avisos antes de quecadique.',
+    tag: 'Desperdicio en kg',
   },
-  none: {
-    label: 'Sin presupuesto',
-    bg: 'bg-stone-500',
-    ring: 'ring-stone-200',
-    text: 'text-stone-700',
+  {
+    icon: PiggyBank,
+    title: 'Finanzas',
+    body: 'Cuentas de efectivo, banco y ahorro, con saldos que se actualizan al registrar ingresos o egresos.',
+    tag: 'Regla 50/30/20',
   },
-};
+  {
+    icon: ScanLine,
+    title: 'Facturas (OCR)',
+    body: 'Sube una foto de tu recibo y extrae los datos. Nada se guarda hasta que confirmas que son correctos.',
+    tag: 'Tesseract · es',
+  },
+  {
+    icon: LineChart,
+    title: 'Simulación',
+    body: 'Ajusta cuánto reducirías en energía, desperdicio o compras y mira el ahorro estimado a 1, 3 y 6 meses.',
+    tag: 'Escenarios',
+  },
+];
 
-function getLevelProgress(points: number, level: number): number {
-  const thresholds = [0, 101, 501, 1501];
-  if (level >= 4) return 100;
-  const start = thresholds[Math.max(0, level - 1)];
-  const next = thresholds[level];
-  return Math.max(0, Math.min(100, Math.round(((points - start) / (next - start)) * 100)));
-}
+const STEPS = [
+  {
+    n: '01',
+    title: 'Registra',
+    body: 'Compra, lectura o alimento. Manual o escaneando la factura: el OCR propone y tú confirmas.',
+  },
+  {
+    n: '02',
+    title: 'Analiza',
+    body: 'El gateway consolida los datos de todos los servicios y calcula gasto, huella, desperdicio y saldos.',
+  },
+  {
+    n: '03',
+    title: 'Decide',
+    body: 'Proyecciones y escenarios muestran qué cambia si ajustas un hábito concreto del hogar.',
+  },
+];
 
-export default function Home() {
-  const router = useRouter();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+const BENEFITS = [
+  {
+    icon: Lightbulb,
+    title: 'Visibilidad real, no intuición',
+    body: 'La mayoría de hogares no sabe cuánto gasta en un mes ni cuánto consume realmente de energía. Aquí queda registrado y se puede desglosar.',
+  },
+  {
+    icon: Target,
+    title: 'Decisiones comparables',
+    body: 'Un escenario no es una promesa: es la diferencia entre tu consumo actual y el ajustado, con el mismo modelo.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Motivación sostenida',
+    body: 'Puntos por cada acción sostenible y logros que explican qué cambió, no solo un ranking.',
+  },
+  {
+    icon: Coins,
+    title: 'Ahorro medible',
+    body: 'El presupuesto 50/30/20 convierte intentions en límites concretos y muestra lo que queda disponible.',
+  },
+];
+
+const SDG_TARGETS = [
+  { code: '12.1', text: 'Conocer y medir el consumo de recursos del hogar.' },
+  { code: '12.3', text: 'Reducir el desperdicio de alimentos y el de los residuos del hogar.' },
+  { code: '12.4', text: 'Mejorar la información y la conciencia sobre el uso sostenible de recursos.' },
+  { code: '12.8', text: 'Fortalecer la educación para un consumo responsable.' },
+];
+
+const FAQ = [
+  {
+    q: '¿La tarifa eléctrica y los factores de CO₂ son los oficiales?',
+    a: 'No. Son valores referenciales y editables, definidos en el código del servicio de simulación para poder modelar escenarios. No sustituyen una factura real ni son una fuente oficial.',
+  },
+  {
+    q: '¿Qué pasa con la privacidad de mis datos?',
+    a: 'Los datos de cada hogar se guardan en bases lógicas separadas por servicio, y los servicios se comunican por eventos, no por acceso directo a la base de otro servicio. Ninguna lectura se envía a terceros.',
+  },
+  {
+    q: '¿Las predicciones son confiables?',
+    a: 'El motor usa regresión lineal sobre el histórico del hogar. Con menos de ocho meses de datos se marcan como preliminares y se muestran con un rango de variación, no como un valor exacto.',
+  },
+  {
+    q: '¿Puedo probar sin levantar los servicios?',
+    a: 'Sí. El frontend incluye un modo demostración con datos de ejemplo en el navegador. Si no hay un API configurado, la app arranca automáticamente en ese modo.',
+  },
+  {
+    q: '¿Qué pasa con la factura escaneada?',
+    a: 'El OCR extrae los campos y los devuelve para revisión. La compra solo se crea cuando confirmas, y en ese momento genera recordatorios para los productos perecibles detectados.',
+  },
+  {
+    q: '¿Cómo se calcula la gamificación?',
+    a: 'Compra registrada suma 5 puntos, energía eficiente 15, energía normal 3, alimento consumido 10 y desperdiciado resta 5. Los umbrales de nivel están en el servicio de gamificación.',
+  },
+];
+
+export default function LandingPage() {
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [dashboard, gamification, budgetsRaw] = await Promise.all([
-          api.getDashboard('hogar_001'),
-          api.getProfile('hogar_001'),
-          api.getBudgets('hogar_001'),
-        ]);
-
-        const d = dashboard as any;
-        const g = gamification as any;
-        if (!d) {
-          setError(true);
-          return;
-        }
-
-        const month = new Date().toISOString().slice(0, 7);
-        const purchases = Array.isArray(d.purchases) ? d.purchases : [];
-        const monthPurchases = purchases.filter((purchase: any) => purchase.month === month);
-        const monthEnergy = (d.energy?.summary ?? []).filter((reading: any) => reading.month === month);
-        const monthFood = (d.food?.summary ?? []).filter((entry: any) => entry.month === month);
-        const spent = monthPurchases.reduce((total: number, purchase: any) => total + Number(purchase.totalBs), 0);
-        const co2FromPurchases = monthPurchases.reduce((total: number, purchase: any) => total + Number(purchase.totalCo2Kg), 0);
-        const energyKwh = monthEnergy.reduce((total: number, reading: any) => total + Number(reading.totalKwh), 0);
-        const energyCo2 = monthEnergy.reduce((total: number, reading: any) => total + Number(reading.totalCo2), 0);
-        const wasteKg = monthFood.reduce((total: number, entry: any) => total + Number(entry.totalKg), 0);
-        const wasteCo2 = monthFood.reduce((total: number, entry: any) => total + Number(entry.totalCo2), 0);
-        const budget = (Array.isArray(budgetsRaw) ? budgetsRaw as any[] : []).find((entry) => entry.month === month);
-        const totalBudget = budget
-          ? Number(budget.needsLimit) + Number(budget.wantsLimit) + Number(budget.savingsTarget)
-          : 0;
-        const pct = totalBudget > 0 ? spent / totalBudget : 0;
-        const trendMap = new Map<string, number>();
-        purchases.forEach((purchase: any) => {
-          trendMap.set(purchase.month, (trendMap.get(purchase.month) ?? 0) + Number(purchase.totalBs));
-        });
-        const trend = Array.from(trendMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([key, amount]) => ({
-          month: new Date(`${key}-01T00:00:00`).toLocaleString('es-BO', { month: 'short' }),
-          amount,
-        }));
-
-        setData({
-          status: totalBudget === 0 ? 'none' : pct < 0.7 ? 'green' : pct < 0.9 ? 'amber' : 'red',
-          remainingBudget: totalBudget - spent,
-          totalBudget,
-          spentBudget: spent,
-          monthLabel: new Date().toLocaleString('es-BO', { month: 'long', year: 'numeric' }),
-          stats: {
-            spent,
-            co2: co2FromPurchases + energyCo2 + wasteCo2,
-            waste: wasteKg,
-            energy: energyKwh,
-          },
-          trend,
-          gamification: {
-            points: g?.points ?? d.gamification?.points ?? 0,
-            level: g?.level ?? d.gamification?.level ?? 1,
-            levelName: g?.levelName ?? d.gamification?.levelName ?? 'Principiante',
-            progress: g?.progress ?? getLevelProgress(Number(g?.points ?? d.gamification?.points ?? 0), Number(g?.level ?? d.gamification?.level ?? 1)),
-          },
-        });
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    const cleanups = [
+      heroIntro({
+        headline: '.landing-hero h1',
+        copy: '.landing-hero-copy > p:not(.landing-kicker):not(.landing-note)',
+        actions: '.landing-actions > *',
+        device: '.landing-device',
+        floatTag: '.landing-float-tag',
+      }),
+      revealOnScroll('.landing-reveal', { y: 28, gap: 90 }),
+      countUpAll('[data-count]'),
+      float('.landing-float-tag', { distance: 8, duration: 3600 }),
+      float('.landing-chip-icon', { distance: 5, duration: 2800, gap: 220 }),
+      tiltOnHover('.landing-module', { max: 4 }),
+      scrollProgress('.landing-progress-bar'),
+    ];
+    return () => cleanups.forEach((fn) => fn?.());
   }, []);
 
-  if (loading) {
-    return (
-      <div className="space-y-5 animate-fade-in">
-        <SkeletonCard />
-        <div className="grid grid-cols-2 gap-4">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-        <SkeletonCard />
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <EmptyState
-        icon={<TrendingUp className="h-8 w-8" />}
-        title="Sin datos disponibles"
-        description="No se pudo cargar el resumen del mes. Verifica tu conexion."
-        action={{ label: 'Reintentar', onClick: () => window.location.reload() }}
-      />
-    );
-  }
-
-  const status = statusConfig[data.status];
-  const spentPct = Math.min(100, Math.round((data.spentBudget / data.totalBudget) * 100));
-
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* ── Hero: Estado del mes ── */}
-      <Card variant="flat" padding={false} className="overflow-hidden">
-        <div className="p-5">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-sm text-stone-500 capitalize">{data.monthLabel}</p>
-              <h1 className="text-xl font-bold text-stone-900 dark:text-stone-50 mt-0.5">Estado del mes</h1>
-            </div>
-            <span className={[
-              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ring-2',
-              status.bg, 'text-white', status.ring,
-            ].join(' ')}>
-              <span className="w-1.5 h-1.5 rounded-full bg-white/70" />
-              {status.label}
-            </span>
-          </div>
+    <div className="landing-page" ref={rootRef}>
+      <div className="landing-progress-bar" aria-hidden="true" />
 
-          <div className="mb-4">
-            <p className="text-sm text-stone-500 mb-1">Presupuesto restante</p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-bold text-stone-900 dark:text-stone-50 nums">
-                {data.totalBudget > 0 ? data.remainingBudget.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-              </span>
-              <span className="text-lg text-stone-400">Bs</span>
-            </div>
-          </div>
-
-          {/* Progress bar */}
-          <div>
-            <div className="flex justify-between text-xs text-stone-400 mb-1.5">
-              <span>Gastado: Bs {data.spentBudget.toLocaleString('es-BO')}</span>
-              <span>{data.totalBudget > 0 ? `${spentPct}% del total` : 'Sin tope mensual'}</span>
-            </div>
-            <div className="h-2.5 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
-              {data.totalBudget > 0 && <div
-                className={['h-full rounded-full transition-all duration-700', status.bg].join(' ')}
-                style={{ width: `${spentPct}%` }}
-              />}
-            </div>
-            <div className="text-right text-xs text-stone-400 mt-1">
-              {data.totalBudget > 0 ? `Meta: Bs ${data.totalBudget.toLocaleString('es-BO')}` : 'Meta: sin definir'}
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* ── Stats grid ── */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card variant="flat">
-          <Stat
-            label="Gasto del mes"
-            value={data.stats.spent}
-            prefix="Bs"
-            decimals={0}
-            icon={<ShoppingCart className="h-5 w-5" />}
-          />
-        </Card>
-        <Card variant="flat">
-          <Stat
-            label="Huella de CO2"
-            value={data.stats.co2}
-            unit="kg"
-            decimals={1}
-            icon={<Leaf className="h-5 w-5" />}
-          />
-        </Card>
-        <Card variant="flat">
-          <Stat
-            label="Desperdicio"
-            value={data.stats.waste}
-            unit="kg"
-            decimals={1}
-            icon={<Trash2 className="h-5 w-5" />}
-          />
-        </Card>
-        <Card variant="flat">
-          <Stat
-            label="Energia"
-            value={data.stats.energy}
-            unit="kWh"
-            decimals={0}
-            icon={<Zap className="h-5 w-5" />}
-          />
-        </Card>
-      </div>
-
-      {/* ── Trend chart ── */}
-      <Card variant="flat" padding={false}>
-        <div className="p-5 pb-2">
-          <h2 className="text-sm font-semibold text-stone-700 dark:text-stone-300">Tendencia de gastos</h2>
-          <p className="text-xs text-stone-400 mt-0.5">Ultimos 6 meses en Bs</p>
-        </div>
-        <div className="h-44 px-1">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data.trend} margin={{ top: 4, right: 12, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#16a34a" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e7e5e4', fontSize: 12 }}
-                formatter={(v: number) => [`Bs ${v.toLocaleString('es-BO')}`, 'Gasto']}
-              />
-              <Area
-                type="monotone"
-                dataKey="amount"
-                stroke="#16a34a"
-                strokeWidth={2.5}
-                fill="url(#areaGrad)"
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="p-3" />
-      </Card>
-
-      {/* ── Gamification card ── */}
-      <Card variant="flat" padding={false}>
-        <Link href="/logros" className="flex items-center gap-4 p-5 hover:bg-stone-50 dark:hover:bg-stone-800/50 rounded-2xl transition-colors">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950 flex items-center justify-center">
-            <Star className="h-6 w-6 text-amber-500" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">
-                Nivel {data.gamification.level}: {data.gamification.levelName}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 mt-1.5">
-              <div className="flex-1 h-2 bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-amber-400 rounded-full"
-                  style={{ width: `${data.gamification.progress}%` }}
-                />
-              </div>
-              <span className="text-xs text-stone-400 nums">{data.gamification.points} pts</span>
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5 text-stone-300 shrink-0" />
+      <header className="landing-nav">
+        <Link href="/" className="landing-brand">
+          Gemelo<span>Digital</span>
         </Link>
-      </Card>
+        <nav aria-label="Navegación principal">
+          <a href="#modulos">Módulos</a>
+          <a href="#propuesta">El proyecto</a>
+          <a href="#arquitectura">Arquitectura</a>
+          <a href="#documentacion">Documentación</a>
+        </nav>
+        <div className="landing-nav-end">
+          <ThemeToggle iconOnly className="landing-theme" />
+          <Link href="/app" className="landing-nav-cta">
+            Probar demo
+          </Link>
+        </div>
+      </header>
 
-      {/* ── Quick actions ── */}
-      <div className="grid grid-cols-3 gap-3">
-        <Button
-          variant="secondary"
-          size="sm"
-          fullWidth
-          icon={<ShoppingCart className="h-4 w-4" />}
-          onClick={() => router.push('/registro')}
-          className="flex-col h-auto py-3 gap-1.5"
-        >
-          <span className="text-xs leading-tight">Registrar compra</span>
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          fullWidth
-          icon={<ScanLine className="h-4 w-4" />}
-          onClick={() => router.push('/escanear')}
-          className="flex-col h-auto py-3 gap-1.5"
-        >
-          <span className="text-xs leading-tight">Escanear factura</span>
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          fullWidth
-          icon={<TrendingUp className="h-4 w-4" />}
-          onClick={() => router.push('/simulador')}
-          className="flex-col h-auto py-3 gap-1.5"
-        >
-          <span className="text-xs leading-tight">Ver predicciones</span>
-        </Button>
-      </div>
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      <section className="landing-hero">
+        <div className="landing-hero-copy">
+          <p className="landing-kicker">ODS 12 · Consumo responsable</p>
+          <h1>Gemelo Digital de Consumo del Hogar</h1>
+          <p>
+            Una herramienta para entender cómo se relacionan tus compras, tu energía y tus alimentos, y
+            decidir con información más clara en lugar de con suposiciones.
+          </p>
+          <div className="landing-actions">
+            <Link href="/app" className="landing-primary">
+              Probar demo <ChevronRight aria-hidden="true" />
+            </Link>
+            <a href="#propuesta" className="landing-secondary">
+              Conocer el proyecto
+            </a>
+          </div>
+          <p className="landing-note">
+            Demostración educativa · Datos de ejemplo · Tarifa eléctrica referencial
+          </p>
+
+          <ul className="landing-badges">
+            <li>
+              <Leaf aria-hidden="true" />Huella de CO₂
+            </li>
+            <li>
+              <Zap aria-hidden="true" />Energía por tramos
+            </li>
+            <li>
+              <Trophy aria-hidden="true" />Logros y puntos
+            </li>
+          </ul>
+        </div>
+
+        <div className="landing-device-wrap" aria-label="Vista previa de la aplicación">
+          <div className="landing-device">
+            <div className="landing-device-top">
+              <span>9:41</span>
+              <span>•••</span>
+            </div>
+            <div className="landing-device-content">
+              <p className="landing-device-date">SEPTIEMBRE 2026</p>
+              <h2>Te quedan este mes</h2>
+              <strong>Bs 730</strong>
+              <div className="landing-progress">
+                <span />
+              </div>
+              <p className="landing-device-muted">Bs 3.470 gastados · 83% del ingreso</p>
+              <div className="landing-mini-stats">
+                <div>
+                  <span>Huella</span>
+                  <b>168 kg</b>
+                </div>
+                <div>
+                  <span>Energía</span>
+                  <b>255 kWh</b>
+                </div>
+              </div>
+              <div className="landing-device-alert">
+                <span /> Energía 11% sobre el promedio
+              </div>
+              <div className="landing-bars" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+            </div>
+            <div className="landing-device-tabs">
+              <span>Inicio</span>
+              <span>Registrar</span>
+              <span>Luz</span>
+              <span>Futuro</span>
+              <span>Logros</span>
+            </div>
+          </div>
+          <div className="landing-float-tag">Predicciones para decidir mejor</div>
+        </div>
+      </section>
+
+      {/* ── Métricas ─────────────────────────────────────────────────── */}
+      <section className="landing-metrics" aria-label="Resumen del proyecto">
+        <div>
+          <strong data-count="7" data-suffix=" servicios">0</strong>
+          <span>microservicios independientes</span>
+        </div>
+        <div>
+          <strong data-count="30" data-suffix="+ endpoints">0</strong>
+          <span>contratos REST en el gateway</span>
+        </div>
+        <div>
+          <strong data-count="4" data-prefix="ODS " data-suffix=" metas">0</strong>
+          <span>del objetivo 12 cubiertos</span>
+        </div>
+        <div>
+          <strong data-count="1" data-suffix=" evento">0</strong>
+          <span>exchange <code>household.events</code></span>
+        </div>
+      </section>
+
+      {/* ── Propuesta ────────────────────────────────────────────────── */}
+      <section id="propuesta" className="landing-section landing-intro landing-reveal">
+        <div>
+          <p className="landing-kicker">Una vista conectada del hogar</p>
+          <h2>Del registro cotidiano a una decisión concreta.</h2>
+        </div>
+        <p>
+          Gemelo reúne indicadores simples del consumo doméstico. Registra compras, escanea facturas y
+          compara escenarios de energía y desperdicio con proyecciones explicables. No sustituye una
+          factura ni un contador: convierte lo que ya mides en algo que puedes anticipar.
+        </p>
+      </section>
+
+      {/* ── Pilares ──────────────────────────────────────────────────── */}
+      <section className="landing-pillars landing-reveal" aria-label="Capacidades principales">
+        <article>
+          <span>01</span>
+          <h3>Predice</h3>
+          <p>Explora tendencias de gasto, energía, desperdicio y CO₂ con rangos de variación.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Escanea</h3>
+          <p>Extrae información de facturas y pide confirmación antes de registrar una compra.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Administra</h3>
+          <p>Organiza presupuesto, saldos y metas de ahorro con una regla 50/30/20.</p>
+        </article>
+      </section>
+
+      {/* ── Módulos ──────────────────────────────────────────────────── */}
+      <section id="modulos" className="landing-section landing-reveal">
+        <div className="landing-section-head">
+          <div>
+            <p className="landing-kicker">Módulos</p>
+            <h2>Seis áreas que comparten los mismos datos.</h2>
+          </div>
+          <p>
+            Cada módulo es un servicio con su propia base lógica, pero todos hablan el mismo idioma
+           a través de eventos. Así puedes usar uno solo o verlos todos en el mismo resumen.
+          </p>
+        </div>
+        <div className="landing-modules">
+          {MODULES.map(({ icon: Icon, title, body, tag }) => (
+            <article className="landing-module" key={title}>
+              <div className="landing-module-top">
+                <span className="landing-module-icon">
+                  <Icon aria-hidden="true" />
+                </span>
+                <span className="landing-module-tag">{tag}</span>
+              </div>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Cómo funciona ────────────────────────────────────────────── */}
+      <section className="landing-section landing-steps landing-reveal">
+        <div className="landing-section-head">
+          <div>
+            <p className="landing-kicker">Cómo se maneja</p>
+            <h2>Tres pasos, sin depender del orden.</h2>
+          </div>
+          <p>
+            Puedes empezar por cualquiera de los tres. Los eventos viajan por RabbitMQ, así que registrar
+            una compra actualiza el presupuesto y la gamificación sin acoplar los servicios.
+          </p>
+        </div>
+        <ol className="landing-steps-list">
+          {STEPS.map(({ n, title, body }) => (
+            <li key={n}>
+              <span className="landing-step-n">{n}</span>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </li>
+          ))}
+        </ol>
+        <div className="landing-flow-track" aria-hidden="true">
+          <span>Registrar</span>
+          <i />
+          <span>Evento</span>
+          <i className="event-pulse" />
+          <span>Predicción</span>
+          <i />
+          <span>Decisión</span>
+        </div>
+      </section>
+
+      {/* ── Predicciones ─────────────────────────────────────────────── */}
+      <section className="landing-section landing-forecast landing-reveal">
+        <div className="landing-section-head">
+          <div>
+            <p className="landing-kicker">Simulación</p>
+            <h2>Escenarios, no promesas.</h2>
+          </div>
+          <p>
+            Mueve los tres palancas que más influyen en tu huella y observa el resultado sobre el mismo
+            modelo que usa el resto de la aplicación.
+          </p>
+        </div>
+        <div className="landing-levers">
+          <div>
+            <Zap className="landing-chip-icon" aria-hidden="true" />
+            <b>Energía</b>
+            <span>Reduce el consumo un 10%</span>
+            <em>−24 kWh/mes</em>
+          </div>
+          <div>
+            <Trash2 className="landing-chip-icon" aria-hidden="true" />
+            <b>Desperdicio</b>
+            <span>Reduce un 20%</span>
+            <em>−3,4 kg/mes</em>
+          </div>
+          <div>
+            <ShoppingCart className="landing-chip-icon" aria-hidden="true" />
+            <b>Compras</b>
+            <span>Reduce un 5%</span>
+            <em>−Bs 174/mes</em>
+          </div>
+        </div>
+        <p className="landing-forecast-note">
+          Valores ilustrativos calculados con los factores referenciales del proyecto. El escenario real
+          se recalcula con los datos del hogar.
+        </p>
+      </section>
+
+      {/* ── Beneficios ───────────────────────────────────────────────── */}
+      <section className="landing-section landing-reveal">
+        <div className="landing-section-head">
+          <div>
+            <p className="landing-kicker">Por qué sirve</p>
+            <h2>Lo que cambia cuando el consumo es visible.</h2>
+          </div>
+        </div>
+        <div className="landing-benefits-grid">
+          {BENEFITS.map(({ icon: Icon, title, body }) => (
+            <article key={title}>
+              <Icon aria-hidden="true" />
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Arquitectura ─────────────────────────────────────────────── */}
+      <section id="arquitectura" className="landing-section landing-architecture landing-reveal">
+        <div>
+          <p className="landing-kicker">Arquitectura</p>
+          <h2>Servicios pequeños, contratos claros.</h2>
+        </div>
+        <div className="architecture-stack">
+          <div>
+            <b>Interfaz</b>
+            <span>Next.js · PWA</span>
+          </div>
+          <div>
+            <b>Gateway</b>
+            <span>NestJS · API REST</span>
+          </div>
+          <div className="architecture-services">
+            <b>Servicios</b>
+            <span>Compras · Energía · Alimentos · Finanzas · Gamificación · Simulación</span>
+          </div>
+          <div>
+            <b>Bus de eventos</b>
+            <span>RabbitMQ · contratos de dominio</span>
+          </div>
+          <div>
+            <b>Datos</b>
+            <span>PostgreSQL · persistencia por servicio</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-tech landing-reveal">
+        <p className="landing-kicker">Tecnologías</p>
+        <div>
+          <span>Next.js</span>
+          <span>NestJS</span>
+          <span>FastAPI</span>
+          <span>scikit-learn</span>
+          <span>RabbitMQ</span>
+          <span>PostgreSQL</span>
+          <span>Tesseract OCR</span>
+        </div>
+      </section>
+
+      {/* ── ODS 12 ───────────────────────────────────────────────────── */}
+      <section className="landing-section landing-reveal">
+        <div className="landing-section-head">
+          <div>
+            <p className="landing-kicker">Alineación con el ODS 12</p>
+            <h2>Producción y consumo responsables.</h2>
+          </div>
+          <p>
+            El proyecto no es solo una app de finanzas: el objetivo es que el hogar pueda observar su
+            consumo y entender de dónde viene, que es exactamente el foco del ODS 12.
+          </p>
+        </div>
+        <ul className="landing-sdg-list">
+          {SDG_TARGETS.map(({ code, text }) => (
+            <li key={code}>
+              <span>{code}</span>
+              <p>{text}</p>
+              <Check aria-hidden="true" />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ── Documentación / FAQ ──────────────────────────────────────── */}
+      <section id="documentacion" className="landing-section landing-docs landing-reveal">
+        <div className="landing-section-head">
+          <div>
+            <p className="landing-kicker">Documentación del proyecto</p>
+            <h2>El modelo detrás de la experiencia.</h2>
+          </div>
+          <p>
+            Las preguntas que más suelen aparecer sobre el alcance, los límites del modelo y el
+            tratamiento de los datos.
+          </p>
+        </div>
+        <div className="landing-faq">
+          {FAQ.map(({ q, a }) => (
+            <details key={q}>
+              <summary>
+                {q}
+                <ChevronRight aria-hidden="true" />
+              </summary>
+              <p>{a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Documentación técnica ─────────────────────────────────────── */}
+      <section className="landing-section landing-notes landing-reveal">
+        <div className="landing-section-head">
+          <div>
+            <p className="landing-kicker">Notas técnicas</p>
+            <h2>Eventos, contratos y modelo.</h2>
+          </div>
+        </div>
+        <div className="landing-notes-grid">
+          <details>
+            <summary>Eventos y endpoints</summary>
+            <p>
+              El gateway conserva los contratos de compras, energía, alimentos, simulación y gamificación.
+              RabbitMQ comunica eventos como <code>purchase.registered</code>, <code>energy.reading</code>,{' '}
+              <code>food.status_changed</code> y <code>bill.saved</code>.
+            </p>
+          </details>
+          <details>
+            <summary>Gamificación y factores de carbono</summary>
+            <p>
+              Compra +5, energía eficiente +15 o normal +3, alimento consumido +10 y desperdiciado −5.
+              Tarifa eléctrica y factores de CO₂ referenciales, editables y no oficiales.
+            </p>
+          </details>
+          <details>
+            <summary>Modelo DDD y ejecución</summary>
+            <p>
+              Entidades y value objects contienen invariantes; servicios de aplicación persisten y publican
+              eventos; adaptadores HTTP y RabbitMQ conectan el dominio. La guía completa está en el README
+              del repositorio.
+            </p>
+          </details>
+          <details>
+            <summary>Ejecución local</summary>
+            <p>
+              <code>docker compose up --build</code> levanta la interfaz en el puerto 4000, el gateway en el
+              3000 y cada microservicio con su base lógica. Con <code>npm run dev</code> el frontend puede
+              trabajar por separado.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      {/* ── Equipo ───────────────────────────────────────────────────── */}
+      <section className="landing-team landing-reveal">
+        <div>
+          <p className="landing-kicker">Equipo</p>
+          <h2>Construido para aprender en conjunto.</h2>
+        </div>
+        <div>
+          <p>
+            <b>Nombre Apellido</b>
+            <span>Desarrollo de producto</span>
+          </p>
+          <p>
+            <b>Nombre Apellido</b>
+            <span>Arquitectura y datos</span>
+          </p>
+          <p>
+            <b>Nombre Apellido</b>
+            <span>Investigación ODS 12</span>
+          </p>
+        </div>
+      </section>
+
+      <footer className="landing-footer landing-reveal">
+        <div>
+          <p className="landing-kicker">ODS 12 · Producción y consumo responsables</p>
+          <h2>Conoce tu consumo. Elige tu siguiente paso.</h2>
+        </div>
+        <div className="landing-footer-end">
+          <Link href="/app" className="landing-primary">
+            Probar demo <ChevronRight aria-hidden="true" />
+          </Link>
+          <p className="landing-legal">
+            Proyecto educativo. Los datos mostrados son de ejemplo y no constituyen un cálculo oficial.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

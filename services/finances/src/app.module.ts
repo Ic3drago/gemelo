@@ -4,6 +4,7 @@ import { Account } from './entities/account.entity';
 import { Transaction } from './entities/transaction.entity';
 import { Goal } from './entities/goal.entity';
 import { Budget } from './entities/budget.entity';
+import { HouseholdBudget } from './entities/household-budget.entity';
 import { FinancesService } from './finances.service';
 import { FinancesController } from './finances.controller';
 import { RabbitMQService } from './rabbitmq.service';
@@ -17,10 +18,10 @@ import { RabbitMQService } from './rabbitmq.service';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASS || 'postgres',
       database: process.env.DB_NAME || 'finances_db',
-      entities: [Account, Transaction, Goal, Budget],
+      entities: [Account, Transaction, Goal, Budget, HouseholdBudget],
       synchronize: true,
     }),
-    TypeOrmModule.forFeature([Account, Transaction, Goal, Budget]),
+    TypeOrmModule.forFeature([Account, Transaction, Goal, Budget, HouseholdBudget]),
   ],
   controllers: [FinancesController],
   providers: [FinancesService, RabbitMQService],

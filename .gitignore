@@ -1,3 +1,38 @@
+# Dependencias
 node_modules/
+.pnp
+.pnp.js
+
+# Builds
 .next/
-tsconfig.tsbuildinfo
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# `frontend/public/demo-data.json` SÍ se versiona a propósito: el modo demo
+# lo lee en build y así funciona en Vercel sin backend. Se regenera con seed.js.
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.idea/
+.vscode/
+*.swp
+
+# Vercel
+.vercel

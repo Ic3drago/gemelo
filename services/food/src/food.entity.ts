@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
 import { FoodStatus } from './food-status.vo';
 
 /** kg CO₂ emitidos por cada kg de alimento desperdiciado */
@@ -31,7 +31,7 @@ export class Food {
   @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   updatedAt: Date;
 
   // ─── Comportamiento de dominio ────────────────────────────────────────────

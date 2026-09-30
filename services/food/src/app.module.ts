@@ -4,6 +4,7 @@ import { FoodController } from './food.controller';
 import { FoodService } from './food.service';
 import { RabbitMQService } from './rabbitmq.service';
 import { Food } from './food.entity';
+import { FoodReminder } from './food-reminder.entity';
 
 @Module({
   imports: [
@@ -14,10 +15,10 @@ import { Food } from './food.entity';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASS || 'postgres',
       database: process.env.DB_NAME || 'food_db',
-      entities: [Food],
+      entities: [Food, FoodReminder],
       synchronize: true, // auto-sync schema for dev
     }),
-    TypeOrmModule.forFeature([Food]),
+    TypeOrmModule.forFeature([Food, FoodReminder]),
   ],
   controllers: [FoodController],
   providers: [FoodService, RabbitMQService],

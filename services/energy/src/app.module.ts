@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EnergyReading } from './energy-reading.entity';
+import { Bill } from './bill.entity';
 import { EnergyService } from './energy.service';
-import { EnergyController, HealthController } from './energy.controller';
+import { BillsController, EnergyController, HealthController } from './energy.controller';
 import { RabbitMQService } from './rabbitmq.service';
 
 @Module({
@@ -14,12 +15,12 @@ import { RabbitMQService } from './rabbitmq.service';
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASS || 'postgres',
       database: process.env.DB_NAME || 'energy_db',
-      entities: [EnergyReading],
+      entities: [EnergyReading, Bill],
       synchronize: true,
     }),
-    TypeOrmModule.forFeature([EnergyReading]),
+    TypeOrmModule.forFeature([EnergyReading, Bill]),
   ],
-  controllers: [EnergyController, HealthController],
+  controllers: [EnergyController, BillsController, HealthController],
   providers: [EnergyService, RabbitMQService],
 })
 export class AppModule {}

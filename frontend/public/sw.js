@@ -1,10 +1,12 @@
 // Basic service worker — caches static assets and provides offline fallback
-const CACHE_NAME = 'gemelo-v1';
-const OFFLINE_URL = '/';
+const CACHE_NAME = 'gemelo-v2';
+const OFFLINE_URL = '/app';
 
 const STATIC_ASSETS = [
-  '/',
+  '/app',
+  '/demo-data.json',
   '/manifest.json',
+  '/icons/icon.svg',
 ];
 
 self.addEventListener('install', (event) => {

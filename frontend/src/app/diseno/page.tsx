@@ -40,7 +40,7 @@ export default function DisenoPage() {
     <div className="space-y-12 max-w-4xl pb-24 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold text-stone-900 dark:text-stone-50">Sistema de Diseno</h1>
-        <p className="text-stone-500 mt-1 text-sm">Componentes y tokens visuales del Gemelo Digital</p>
+        <p className="text-stone-500 mt-1 text-sm dark:text-stone-400">Componentes y tokens visuales del Gemelo Digital</p>
       </div>
 
       {/* ── Logo ── */}
@@ -66,7 +66,7 @@ export default function DisenoPage() {
                 {color.shades.map((shade) => (
                   <div key={shade} className="group flex flex-col items-center">
                     <div className={`w-10 h-10 rounded-lg ${color.prefix}${shade} border border-stone-200/50`} />
-                    <span className="text-[10px] text-stone-400 mt-1">{shade}</span>
+                    <span className="text-[10px] text-stone-400 mt-1 dark:text-stone-500">{shade}</span>
                   </div>
                 ))}
               </div>
@@ -81,7 +81,7 @@ export default function DisenoPage() {
         <Card variant="flat" padding={false}>
           {TYPE_SCALE.map(({ label, class: cls, sample }, i) => (
             <div key={label} className={['flex items-baseline gap-4 px-5 py-4', i > 0 ? 'border-t border-stone-100 dark:border-stone-800' : ''].join(' ')}>
-              <span className="text-xs text-stone-400 w-16 shrink-0">{label}</span>
+              <span className="text-xs text-stone-400 w-16 shrink-0 dark:text-stone-500">{label}</span>
               <span className={['text-stone-900 dark:text-stone-50', cls].join(' ')}>{sample}</span>
             </div>
           ))}
@@ -115,16 +115,16 @@ export default function DisenoPage() {
         <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100 mb-4">Cards</h2>
         <div className="grid sm:grid-cols-3 gap-4">
           <Card variant="flat">
-            <p className="text-sm font-semibold text-stone-700">Flat</p>
-            <p className="text-xs text-stone-400 mt-1">Con borde sutil</p>
+            <p className="text-sm font-semibold text-stone-700 dark:text-stone-300">Flat</p>
+            <p className="text-xs text-stone-400 mt-1 dark:text-stone-500">Con borde sutil</p>
           </Card>
           <Card variant="elevated">
-            <p className="text-sm font-semibold text-stone-700">Elevated</p>
-            <p className="text-xs text-stone-400 mt-1">Con sombra</p>
+            <p className="text-sm font-semibold text-stone-700 dark:text-stone-300">Elevated</p>
+            <p className="text-xs text-stone-400 mt-1 dark:text-stone-500">Con sombra</p>
           </Card>
           <Card variant="outlined">
-            <p className="text-sm font-semibold text-stone-700">Outlined</p>
-            <p className="text-xs text-stone-400 mt-1">Solo borde</p>
+            <p className="text-sm font-semibold text-stone-700 dark:text-stone-300">Outlined</p>
+            <p className="text-xs text-stone-400 mt-1 dark:text-stone-500">Solo borde</p>
           </Card>
         </div>
       </section>
@@ -200,7 +200,7 @@ export default function DisenoPage() {
         <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100 mb-4">Bottom Sheet</h2>
         <Button variant="secondary" onClick={() => setSheet(true)}>Abrir sheet</Button>
         <BottomSheet open={sheet} onClose={() => setSheet(false)} title="Ejemplo de bottom sheet">
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-stone-500 dark:text-stone-400">
             Este es el contenido del bottom sheet. Se desliza desde abajo en movil y actua como un modal centrado en desktop.
           </p>
           <div className="mt-4">

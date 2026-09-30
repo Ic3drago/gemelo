@@ -1,4 +1,13 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+import { fetchDemoAPI } from '@/lib/demo';
+
+// `NEXT_PUBLIC_*` values are inlined at build time, so this must be resolved
+// statically. When no API base URL is provided (for example a Vercel deploy with
+// no backend attached) we fall back to the in-browser demo dataset instead of
+// firing requests at a dead host, so the UI always has something to render.
+const CONFIGURED_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim() ?? '';
+const FORCE_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const USE_DEMO = FORCE_DEMO || !/^https?:\/\//.test(CONFIGURED_API_URL);
+const API_URL = USE_DEMO ? '' : CONFIGURED_API_URL.replace(/\/$/, '');
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -11,6 +20,9 @@ interface FetchOptions {
 async function fetchAPI<T = unknown>(endpoint: string, options: FetchOptions = {}): Promise<T | null> {
   try {
     const { method = 'GET', body, isFormData = false } = options;
+    if (USE_DEMO) {
+      return await fetchDemoAPI(endpoint, { method, body }) as T | null;
+    }
 
     const headers: Record<string, string> = {};
     if (!isFormData) {
@@ -81,6 +93,16 @@ export const api = {
     deviceType?: string;
   }) => fetchAPI('/api/energy/readings', { method: 'POST', body: data }),
 
+  // ── Electricity bills ──────────────────────────────────────────────────────
+  calculateBill: (data: { kWh: number }) =>
+    fetchAPI('/api/bills/calculate', { method: 'POST', body: data }),
+
+  createBill: (data: { householdId?: string; kWh: number; month: string }) =>
+    fetchAPI('/api/bills', { method: 'POST', body: data }),
+
+  getBills: (householdId = 'hogar_001') =>
+    fetchAPI(`/api/bills?householdId=${householdId}`),
+
   // ── Food ───────────────────────────────────────────────────────────────────
   getFood: (params = '') =>
     fetchAPI(`/api/food${params ? '?' + params : ''}`),
@@ -111,13 +133,18 @@ export const api = {
   getPointsHistory: (householdId = 'hogar_001') =>
     fetchAPI(`/api/gamification/points-history/${householdId}`),
 
+  getLeaderboard: () => fetchAPI('/api/gamification/leaderboard'),
+
+  getFoodReminders: (householdId = 'hogar_001') =>
+    fetchAPI(`/api/food/reminders?householdId=${householdId}`),
+
   // ── Simulation & Predictions ───────────────────────────────────────────────
   simulate: (data: {
-    householdId: string;
-    horizonMonths: number;
-    wasteReductionPct: number;
-    energyReductionPct: number;
-    purchaseChangePct: number;
+    householdId?: string;
+    months: number;
+    waste: number;
+    energy: number;
+    purchases: number;
   }) => fetchAPI('/api/simulate', { method: 'POST', body: data }),
 
   predictSimulation: (data: { householdId: string; horizonMonths?: number }) =>
@@ -153,8 +180,14 @@ export const api = {
   getGoals: (householdId = 'hogar_001') =>
     fetchAPI(`/api/finances/goals?householdId=${householdId}`),
 
-  createGoal: (data: { name: string; targetAmount: number }) =>
+  createGoal: (data: { name: string; targetAmount: number; targetDate?: string }) =>
     fetchAPI('/api/finances/goals', { method: 'POST', body: data }),
+
+  getHouseholdBudget: (householdId = 'hogar_001') =>
+    fetchAPI(`/api/budget?householdId=${householdId}`),
+
+  setHouseholdBudget: (data: { householdId?: string; income: number }) =>
+    fetchAPI('/api/budget', { method: 'PUT', body: data }),
 
   // ── Invoices / OCR ─────────────────────────────────────────────────────────
   scanInvoice: (formData: FormData) =>
@@ -164,7 +197,10 @@ export const api = {
     householdId: string;
     store: string;
     date: string;
+    nit?: string;
+    number?: string;
+    category?: string;
     total: number;
-    items?: Array<{ name: string; price: string }>;
-  }) => fetchAPI('/api/invoices', { method: 'POST', body: data }),
+    items?: Array<{ name: string; price: string; category?: string; perishability?: boolean; estimatedExpiryDays?: number | null }>;
+  }) => fetchAPI('/api/invoices/confirm', { method: 'POST', body: data }),
 };

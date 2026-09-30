@@ -1,0 +1,42 @@
+{
+  "income": 4200,
+  "months": [
+    { "month": "2026-04", "energyKwh": 221, "wasteKg": 5.4, "categories": { "alimentos": 1880, "servicios": 490, "transporte": 210, "ocio": 320, "hogar": 160 } },
+    { "month": "2026-05", "energyKwh": 228, "wasteKg": 6.1, "categories": { "alimentos": 1940, "servicios": 510, "transporte": 190, "ocio": 280, "hogar": 240 } },
+    { "month": "2026-06", "energyKwh": 224, "wasteKg": 5.8, "categories": { "alimentos": 2010, "servicios": 500, "transporte": 230, "ocio": 310, "hogar": 190 } },
+    { "month": "2026-07", "energyKwh": 236, "wasteKg": 7.2, "categories": { "alimentos": 2050, "servicios": 520, "transporte": 210, "ocio": 350, "hogar": 210 } },
+    { "month": "2026-08", "energyKwh": 241, "wasteKg": 7.1, "categories": { "alimentos": 2090, "servicios": 505, "transporte": 220, "ocio": 300, "hogar": 180 } },
+    { "month": "2026-09", "energyKwh": 255, "wasteKg": 8.5, "categories": { "alimentos": 850, "servicios": 400, "transporte": 140, "ocio": 330, "hogar": 250 } }
+  ],
+  "bills": [
+    { "month": "2026-04", "kWh": 221, "totalBs": 226.49, "co2Kg": 110.5 },
+    { "month": "2026-05", "kWh": 228, "totalBs": 235.02, "co2Kg": 114 },
+    { "month": "2026-06", "kWh": 224, "totalBs": 230.14, "co2Kg": 112 },
+    { "month": "2026-07", "kWh": 236, "totalBs": 244.77, "co2Kg": 118 },
+    { "month": "2026-08", "kWh": 241, "totalBs": 250.87, "co2Kg": 120.5 },
+    { "month": "2026-09", "kWh": 255, "totalBs": 264.28, "co2Kg": 127.5 }
+  ],
+  "accounts": [
+    { "id": "demo-cash", "name": "Efectivo", "type": "cash", "balance": 500 },
+    { "id": "demo-bank", "name": "Banco", "type": "bank", "balance": 3500 },
+    { "id": "demo-savings", "name": "Ahorro", "type": "savings", "balance": 1200 }
+  ],
+  "transactions": [
+    { "id": "seed-income-2026-04", "description": "Ingreso mensual", "amount": 4200, "type": "income", "category": "income", "timestamp": "2026-04-01T12:00:00.000Z" },
+    { "id": "seed-rent-2026-04", "description": "Alquiler", "amount": 1500, "type": "expense", "category": "needs", "timestamp": "2026-04-05T12:00:00.000Z" },
+    { "id": "seed-income-2026-05", "description": "Ingreso mensual", "amount": 4200, "type": "income", "category": "income", "timestamp": "2026-05-01T12:00:00.000Z" },
+    { "id": "seed-rent-2026-05", "description": "Alquiler", "amount": 1500, "type": "expense", "category": "needs", "timestamp": "2026-05-05T12:00:00.000Z" },
+    { "id": "seed-income-2026-06", "description": "Ingreso mensual", "amount": 4200, "type": "income", "category": "income", "timestamp": "2026-06-01T12:00:00.000Z" },
+    { "id": "seed-rent-2026-06", "description": "Alquiler", "amount": 1500, "type": "expense", "category": "needs", "timestamp": "2026-06-05T12:00:00.000Z" },
+    { "id": "seed-income-2026-07", "description": "Ingreso mensual", "amount": 4200, "type": "income", "category": "income", "timestamp": "2026-07-01T12:00:00.000Z" },
+    { "id": "seed-rent-2026-07", "description": "Alquiler", "amount": 1500, "type": "expense", "category": "needs", "timestamp": "2026-07-05T12:00:00.000Z" },
+    { "id": "seed-income-2026-08", "description": "Ingreso mensual", "amount": 4200, "type": "income", "category": "income", "timestamp": "2026-08-01T12:00:00.000Z" },
+    { "id": "seed-rent-2026-08", "description": "Alquiler", "amount": 1500, "type": "expense", "category": "needs", "timestamp": "2026-08-05T12:00:00.000Z" },
+    { "id": "seed-income-2026-09", "description": "Ingreso mensual", "amount": 4200, "type": "income", "category": "income", "timestamp": "2026-09-01T12:00:00.000Z" },
+    { "id": "seed-rent-2026-09", "description": "Alquiler", "amount": 1500, "type": "expense", "category": "needs", "timestamp": "2026-09-05T12:00:00.000Z" }
+  ],
+  "goals": [
+    { "id": "demo-goal-1", "name": "Fondo de emergencia", "targetAmount": 5000, "currentAmount": 1200, "targetDate": "2027-03-29" }
+  ],
+  "gamification": { "points": 86, "level": 1, "levelName": "Principiante", "nextLevelPoints": 101, "progress": 85 }
+}

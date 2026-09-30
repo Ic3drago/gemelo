@@ -25,6 +25,7 @@ def parse_invoice(image_bytes: bytes):
     
     date_match = re.search(r'(?i)Fecha.*?:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', text)
     date = date_match.group(1) if date_match else None
+    store = next((line.strip() for line in text.splitlines() if line.strip()), None)
     
     # Items
     items = []
@@ -38,7 +39,7 @@ def parse_invoice(image_bytes: bytes):
             
             # Simple classification
             name_lower = name.lower()
-            if any(word in name_lower for word in ['leche', 'pan', 'carne', 'pollo', 'arroz', 'fideo', 'galleta', 'agua', 'jugo']):
+            if any(word in name_lower for word in ['leche', 'pan', 'carne', 'pollo', 'arroz', 'fideo', 'galleta', 'agua', 'jugo', 'papa', 'tomate', 'queso', 'huevo']):
                 category = 'alimentos'
                 perishability = True
             elif any(word in name_lower for word in ['jabon', 'shampoo', 'detergente', 'limpiador', 'escoba']):
@@ -56,19 +57,23 @@ def parse_invoice(image_bytes: bytes):
                         "name": name,
                         "price": price,
                         "category": category,
-                        "perishability": perishability
+                        "perishability": perishability,
+                        "estimatedExpiryDays": 5 if perishability else None,
                     })
                 
     confidence = 'high' if (nit and number and total and date) else ('medium' if (nit or number or total or date) else 'low')
     
     return {
         "success": True,
+        "requiresConfirmation": True,
         "data": {
+            "store": store,
             "nit": nit,
             "date": date,
             "number": number,
             "total": total,
-            "items": items
+            "items": items,
+            "category": "alimentos" if any(item["category"] == "alimentos" for item in items) else "hogar",
         },
         "confidence": confidence
     }

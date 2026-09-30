@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Line,
 } from 'recharts';
 import { Sliders, Leaf, Zap, ShoppingCart, TrendingDown } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -10,6 +10,8 @@ import { Card } from '@/design-system/Card';
 import { Button } from '@/design-system/Button';
 import { EmptyState } from '@/design-system/EmptyState';
 import { SkeletonCard } from '@/design-system/Skeleton';
+import { Badge } from '@/design-system/Badge';
+import { Chart } from '@/design-system/Chart';
 
 interface SimResults {
   co2Saved: number;
@@ -19,23 +21,65 @@ interface SimResults {
   chartData: Array<{ name: string; baseline: number; scenario: number }>;
 }
 
+type Metric = 'gasto' | 'energia' | 'desperdicio';
+type ForecastPoint = { name: string; lower: number; range: number; prediction: number | null; actual: number | null };
+
 export default function SimuladorPage() {
   const [wasteReduction, setWasteReduction]   = useState(20);
   const [energyReduction, setEnergyReduction] = useState(10);
-  const [purchaseChange, setPurchaseChange]   = useState(-5);
+  const [purchaseChange, setPurchaseChange]   = useState(5);
   const [horizon, setHorizon]                 = useState<3 | 6 | 12>(6);
   const [loading, setLoading]                 = useState(false);
   const [results, setResults]                 = useState<SimResults | null>(null);
+  const [metric, setMetric]                   = useState<Metric>('gasto');
+  const [forecast, setForecast]               = useState<ForecastPoint[]>([]);
+  const [forecastLoading, setForecastLoading] = useState(true);
+  const [preliminary, setPreliminary]         = useState(true);
+
+  useEffect(() => {
+    api.getPredictions('hogar_001').then((raw) => {
+      const response = raw as Record<string, any> | null;
+      const aliases: Record<Metric, string[]> = {
+        gasto: ['gasto', 'purchases'],
+        energia: ['energia', 'energy'],
+        desperdicio: ['desperdicio', 'food_waste'],
+      };
+      const update = (selected: Metric) => {
+        const item = aliases[selected].map((key) => response?.[key]).find(Boolean);
+        const result = item?.months_6 ?? item;
+        const predictions: number[] = result?.predictions ?? [];
+        const low: number[] = result?.lo ?? [];
+        const high: number[] = result?.hi ?? [];
+        const history: number[] = item?.history ?? [];
+        setPreliminary(Boolean(result?.is_preliminary ?? item?.is_preliminary ?? true));
+        const historicalPoints = history.map((value, index) => ({ name: `-${history.length - index}`, lower: value, range: 0, prediction: null, actual: value }));
+        const projectionPoints = predictions.map((value, index) => ({
+          name: `+${index + 1}`,
+          lower: low[index] ?? value,
+          range: Math.max(0, (high[index] ?? value) - (low[index] ?? value)),
+          prediction: value,
+          actual: null,
+        }));
+        setForecast([...historicalPoints, ...projectionPoints]);
+      };
+      update(metric);
+      setForecastLoading(false);
+    }).catch(() => setForecastLoading(false));
+  }, [metric]);
+
+  const selectMetric = (next: Metric) => {
+    setMetric(next);
+  };
 
   const handleSimulate = async () => {
     setLoading(true);
     try {
       const responseRaw = await api.simulate({
         householdId: 'hogar_001',
-        horizonMonths: horizon,
-        wasteReductionPct: wasteReduction,
-        energyReductionPct: energyReduction,
-        purchaseChangePct: Math.abs(purchaseChange),
+        months: horizon,
+        waste: wasteReduction,
+        energy: energyReduction,
+        purchases: purchaseChange,
       });
       const response = responseRaw as any;
 
@@ -56,7 +100,7 @@ export default function SimuladorPage() {
         // Fallback mock
         setResults({
           co2Saved: wasteReduction * 0.8 + energyReduction * 0.4,
-          moneySaved: Math.abs(purchaseChange) * 15 + energyReduction * 8,
+          moneySaved: purchaseChange * 15 + energyReduction * 8,
           wasteSaved: wasteReduction * 0.3,
           energySaved: energyReduction * 12,
           chartData: Array.from({ length: horizon }, (_, i) => ({
@@ -84,14 +128,34 @@ export default function SimuladorPage() {
     <div className="space-y-5 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Predicciones</h1>
-        <p className="text-sm text-stone-500 mt-0.5">Simula el impacto de cambiar tus habitos</p>
+        <p className="text-sm text-stone-500 mt-0.5 dark:text-stone-400">Simula el impacto de cambiar tus habitos</p>
       </div>
+
+      <Card variant="flat" className="space-y-4">
+        <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-semibold">Proyección a seis meses</h2><p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Regresión lineal y rango estimado de variación</p></div>{preliminary && <Badge variant="warning">Predicción preliminar</Badge>}</div>
+        <div className="grid grid-cols-3 gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-700 dark:bg-stone-900">
+          {(['gasto', 'energia', 'desperdicio'] as const).map((value) => <button key={value} type="button" aria-pressed={metric === value} onClick={() => selectMetric(value)} className={['min-h-10 rounded-md px-2 text-xs font-semibold', metric === value ? 'bg-white text-forest-800 shadow-sm dark:bg-stone-800 dark:text-white' : 'text-stone-500'].join(' ')}>{value === 'gasto' ? 'Gasto' : value === 'energia' ? 'Energía' : 'Desperdicio'}</button>)}
+        </div>
+        <div className="h-56">
+          {forecastLoading ? <SkeletonCard /> : forecast.length ? <Chart title={`Proyección de ${metric}`} height={220}><ResponsiveContainer width="100%" height="100%"><AreaChart data={forecast} margin={{ top: 8, right: 12, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#d5ddd4" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#78857b' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#78857b' }} axisLine={false} tickLine={false} />
+            <Tooltip formatter={(value: number) => [`${value.toFixed(1)} ${metric === 'energia' ? 'kWh' : metric === 'desperdicio' ? 'kg' : 'Bs'}`, '']} />
+            <Area dataKey="lower" stackId="range" stroke="transparent" fill="transparent" />
+            <Area dataKey="range" stackId="range" stroke="none" fill="#3E7CB1" fillOpacity={0.2} />
+            <Line dataKey="actual" name="Histórico" stroke="#1F4D3A" strokeWidth={2.5} dot={{ r: 2 }} connectNulls={false} />
+            <Line dataKey="prediction" name="Proyección" stroke="#3E7CB1" strokeWidth={2.5} strokeDasharray="6 5" dot={false} />
+          </AreaChart></ResponsiveContainer></Chart> : <EmptyState icon={<TrendingDown />} title="Predicción no disponible" description="Agrega datos históricos para poder calcular una proyección." />}
+        </div>
+        <p className="text-xs text-stone-500 dark:text-stone-400">La banda muestra una desviación estándar del residuo; los resultados son estimaciones, no garantías.</p>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* ── Controls ── */}
-        <Card variant="flat" className="lg:col-span-1 space-y-5">
+        <Card variant="flat" className="lg:col-span-1 space-y-5" data-tour="simulation-controls">
           <div className="flex items-center gap-2">
-            <Sliders className="h-5 w-5 text-forest-600" />
+            <Sliders className="h-5 w-5 text-forest-600 dark:text-forest-400" />
             <h2 className="text-base font-semibold text-stone-800 dark:text-stone-100">Parametros</h2>
           </div>
 
@@ -101,7 +165,7 @@ export default function SimuladorPage() {
               <label className="text-sm text-stone-600 dark:text-stone-400 flex items-center gap-1.5">
                 <Leaf className="h-4 w-4 text-forest-500" /> Reduccion de desperdicio
               </label>
-              <span className="text-sm font-semibold text-forest-600">{wasteReduction}%</span>
+              <span className="text-sm font-semibold text-forest-600 dark:text-forest-400">{wasteReduction}%</span>
             </div>
             <input
               type="range" min="0" max="50" value={wasteReduction}
@@ -116,7 +180,7 @@ export default function SimuladorPage() {
               <label className="text-sm text-stone-600 dark:text-stone-400 flex items-center gap-1.5">
                 <Zap className="h-4 w-4 text-sky-500" /> Reduccion de energia
               </label>
-              <span className="text-sm font-semibold text-sky-600">{energyReduction}%</span>
+              <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">{energyReduction}%</span>
             </div>
             <input
               type="range" min="0" max="50" value={energyReduction}
@@ -129,14 +193,14 @@ export default function SimuladorPage() {
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-sm text-stone-600 dark:text-stone-400 flex items-center gap-1.5">
-                <ShoppingCart className="h-4 w-4 text-amber-500" /> Cambio en compras
+                <ShoppingCart className="h-4 w-4 text-amber-500" /> Reduccion de compras
               </label>
-              <span className="text-sm font-semibold text-amber-600">
-                {purchaseChange > 0 ? '+' : ''}{purchaseChange}%
+              <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                {purchaseChange}%
               </span>
             </div>
             <input
-              type="range" min="-30" max="10" value={purchaseChange}
+              type="range" min="0" max="30" value={purchaseChange}
               onChange={(e) => setPurchaseChange(Number(e.target.value))}
               className="w-full"
             />
@@ -154,7 +218,7 @@ export default function SimuladorPage() {
                     'flex-1 py-2 text-sm font-medium rounded-lg transition-colors',
                     horizon === m
                       ? 'bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-50 shadow-sm'
-                      : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300',
+                      : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 dark:text-stone-400',
                   ].join(' ')}
                 >
                   {m}m
@@ -198,10 +262,10 @@ export default function SimuladorPage() {
                       {icon}
                     </div>
                     <div>
-                      <p className="text-xs text-stone-500 font-medium">{label}</p>
+                      <p className="text-xs text-stone-500 font-medium dark:text-stone-400">{label}</p>
                       <p className={['text-xl font-bold nums', color].join(' ')}>
                         {typeof value === 'number' ? value.toFixed(1) : value}
-                        <span className="text-xs font-normal text-stone-400 ml-1">{unit}</span>
+                        <span className="text-xs font-normal text-stone-400 ml-1 dark:text-stone-500">{unit}</span>
                       </p>
                     </div>
                   </Card>
@@ -214,7 +278,7 @@ export default function SimuladorPage() {
                   <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-300">
                     Proyeccion de emisiones CO2
                   </h3>
-                  <p className="text-xs text-stone-400 mt-0.5">Escenario actual vs con cambios</p>
+                  <p className="text-xs text-stone-400 mt-0.5 dark:text-stone-500">Escenario actual vs con cambios</p>
                 </div>
                 <div className="h-56 px-2 pb-4">
                   <ResponsiveContainer width="100%" height="100%">

@@ -23,7 +23,7 @@ export function Card({
   return (
     <div
       className={[
-        'rounded-2xl',
+        'rounded-lg',
         variantClasses[variant],
         padding ? 'p-5' : '',
         className,

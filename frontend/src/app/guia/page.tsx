@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  BookOpen, ShoppingCart, Leaf, Zap, ScanLine, TrendingUp, Wallet,
+  BookOpen, ShoppingCart, Leaf, Zap, ScanLine, TrendingUp, Wallet, Trophy,
   ChevronDown, ChevronRight, Search,
 } from 'lucide-react';
 import { Card } from '@/design-system/Card';
@@ -32,57 +32,57 @@ interface GlossaryItem {
 const steps: Step[] = [
   {
     id: 1,
-    title: 'Registra tus compras',
-    icon: <ShoppingCart className="h-5 w-5" />,
-    description: 'Cada compra que registras alimenta el modelo de prediccion y te ayuda a entender tus gastos reales.',
-    howTo: 'Ve a Registrar, selecciona "Compra", elige la categoria, escribe el articulo y el monto.',
-    example: 'Supermercado, Papa 2kg, Bs 8.50',
-    href: '/registro',
+    title: 'Configura el hogar y el presupuesto',
+    icon: <Wallet className="h-5 w-5" />,
+    description: 'Define el ingreso mensual para que el resumen 50/30/20 y el saldo disponible tengan una referencia útil.',
+    howTo: '1. Abre Presupuesto. 2. Ingresa el ingreso mensual y guarda. 3. Revisa límites y cuentas.',
+    example: 'Con Bs 4.200: necesidades Bs 2.100, deseos Bs 1.260 y ahorro Bs 840.',
+    href: '/app/presupuesto',
   },
   {
     id: 2,
-    title: 'Controla tus alimentos',
-    icon: <Leaf className="h-5 w-5" />,
-    description: 'Registrar que alimentos guardas, consumes o desperdicias reduce tu huella de carbono y ahorra dinero.',
-    howTo: 'Ve a Registrar, selecciona "Alimento" y usa los botones: Guardar, Consumido o Desperdicio.',
-    example: 'Verduras, Tomates 500g — marcados como Consumido gana +10 pts',
-    href: '/registro',
+    title: 'Registra una compra o escanea una factura',
+    icon: <ShoppingCart className="h-5 w-5" />,
+    description: 'Cada gasto alimenta el historial y permite estimar cómo cambian tus compras mes a mes.',
+    howTo: '1. Abre Registrar. 2. Escribe categoría, producto y monto, o abre Escanear. 3. Revisa y confirma.',
+    example: 'Arroz y verduras por Bs 38.50 en la categoría Alimentos.',
+    href: '/app/registrar',
   },
   {
     id: 3,
-    title: 'Monitorea tu energia',
-    icon: <Zap className="h-5 w-5" />,
-    description: 'Ingresar lecturas de tu medidor permite calcular tu huella de carbono y proyectar el costo de tu factura.',
-    howTo: 'Ve a Registrar, selecciona "Energia" e ingresa el consumo en kWh del mes o semana.',
-    example: '120 kWh = Bs 106.80 estimados + 45.6 kg CO2',
-    href: '/registro',
+    title: 'Lee el panel mensual',
+    icon: <BookOpen className="h-5 w-5" />,
+    description: 'El inicio reúne saldo, alertas, avance 50/30/20 y huella del hogar.',
+    howTo: '1. Abre Inicio. 2. Mira el saldo disponible. 3. Compara alertas y tendencia.',
+    example: 'Ingreso Bs 4.200 menos gastos Bs 3.470 deja Bs 730 disponibles.',
+    href: '/app',
   },
   {
     id: 4,
-    title: 'Escanea facturas con la camara',
-    icon: <ScanLine className="h-5 w-5" />,
-    description: 'La funcion de escaneo extrae automaticamente los datos de tus recibos con OCR para ahorrar tiempo.',
-    howTo: 'Ve a Escanear, toma una foto del recibo o subirla desde galeria, revisa los datos extraidos y guarda.',
-    example: 'Ticket de Hipermaxi escaneado: extrae tienda, fecha, total e items en segundos',
-    href: '/escanear',
+    title: 'Entiende las predicciones',
+    icon: <TrendingUp className="h-5 w-5" />,
+    description: 'La línea central muestra una tendencia y la banda comunica variación posible, no una certeza.',
+    howTo: '1. Abre Futuro. 2. Elige gasto, energía o desperdicio. 3. Compara la línea con el rango.',
+    example: 'Un gasto proyectado de Bs 2.300 puede mostrarse con un rango aproximado de Bs 2.050 a Bs 2.550.',
+    href: '/app/futuro',
   },
   {
     id: 5,
-    title: 'Simula el futuro',
-    icon: <TrendingUp className="h-5 w-5" />,
-    description: 'El simulador usa tus datos historicos para proyectar como cambiaria tu consumo si adoptas nuevos habitos.',
-    howTo: 'Ve a Predicciones, ajusta los deslizadores de reduccion y presiona Simular impacto.',
-    example: 'Reducir 20% desperdicio durante 6 meses = ~12kg CO2 menos y Bs 240 ahorrados',
-    href: '/simulador',
+    title: 'Prueba un hábito en el simulador',
+    icon: <Zap className="h-5 w-5" />,
+    description: 'Compara el escenario actual con una reducción de energía, desperdicio o compras.',
+    howTo: '1. Abre Futuro. 2. Ajusta los porcentajes. 3. Pulsa Simular impacto.',
+    example: 'Evitar 2 kg de desperdicio estima Bs 40 de ahorro y 5 kg de CO₂ evitados.',
+    href: '/app/futuro',
   },
   {
     id: 6,
-    title: 'Gestiona tu presupuesto',
-    icon: <Wallet className="h-5 w-5" />,
-    description: 'La regla 50/30/20 divide tu ingreso en necesidades, deseos y ahorro para mantener salud financiera.',
-    howTo: 'Ve a Presupuesto, revisa los anillos de progreso y agrega transacciones con el boton +.',
-    example: 'Ingreso Bs 5,000: Necesidades max Bs 2,500 | Deseos max Bs 1,500 | Ahorro min Bs 1,000',
-    href: '/presupuesto',
+    title: 'Gana tus primeros logros',
+    icon: <Trophy className="h-5 w-5" />,
+    description: 'Los puntos hacen visibles hábitos registrados; cada tipo de actividad tiene una regla fija.',
+    howTo: '1. Abre Registrar. 2. Registra una compra o consume un alimento. 3. Revisa Logros.',
+    example: 'Una compra suma 5 puntos; consumir un alimento suma 10 puntos.',
+    href: '/app/logros',
   },
 ];
 
@@ -93,7 +93,7 @@ const faqs: FAQ[] = [
   },
   {
     q: '¿Como se calculan los puntos?',
-    a: 'Cada registro suma puntos: compra +5, lectura de energia +5, alimento guardado +2, alimento consumido +10. Acumula puntos para subir de nivel.',
+    a: 'Compra +5, energía eficiente +15, energía normal +3, alimento consumido +10 y alimento desperdiciado -5.',
   },
   {
     q: '¿Mis datos estan protegidos?',
@@ -101,7 +101,7 @@ const faqs: FAQ[] = [
   },
   {
     q: '¿Puedo usar el gemelo sin internet?',
-    a: 'La aplicacion funciona offline para consultar datos guardados. Para sincronizar nuevos registros necesitas conexion.',
+    a: 'En modo demo se consultan datos de ejemplo guardados en el navegador. Para guardar datos reales necesitas conexión con los servicios.',
   },
   {
     q: '¿Que pasa si ingreso un dato incorrecto?',
@@ -110,10 +110,10 @@ const faqs: FAQ[] = [
 ];
 
 const glossary: GlossaryItem[] = [
-  { term: 'Proyeccion', definition: 'Estimacion del comportamiento futuro basada en tus datos historicos. Indica la tendencia probable, no un valor exacto.' },
-  { term: 'Rango de confianza', definition: 'Intervalo entre el mejor y peor escenario posible. Cuanto mas datos tengas, mas estrecho y preciso es el rango.' },
-  { term: 'Gasto fijo', definition: 'Costo que se repite mensualmente con poco cambio: alquiler, servicios basicos, cuotas. El gemelo lo detecta automaticamente.' },
-  { term: 'Desperdicio alimentario', definition: 'Alimento comprado pero que no se consuma. Se mide en kg y tiene un costo economico y de CO2 asociado.' },
+  { term: 'Proyección', definition: 'Estimación del comportamiento futuro basada en una serie histórica. Indica tendencia, no un valor garantizado.' },
+  { term: 'Rango', definition: 'Intervalo de variación estimado a partir de los residuos de la regresión. No es una garantía estadística oficial.' },
+  { term: 'Gasto fijo', definition: 'Costo que se repite mensualmente con pocos cambios, como alquiler o servicios.' },
+  { term: 'Desperdicio', definition: 'Alimento registrado como desperdiciado, medido en kilogramos y asociado a costo y CO₂ estimados.' },
   { term: 'Huella de carbono', definition: 'Total de emisiones de CO2 equivalente generadas por tus habitos de consumo energetico y alimentario.' },
   { term: 'kWh', definition: 'Kilovatio-hora: unidad de energia electrica. Un televisor tipico consume 0.1 kWh/hora.' },
 ];
@@ -121,6 +121,21 @@ const glossary: GlossaryItem[] = [
 export default function GuiaPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [search, setSearch] = useState('');
+  const [completed, setCompleted] = useState<number[]>([]);
+  const [contextScreen, setContextScreen] = useState('');
+
+  useEffect(() => {
+    try { setCompleted(JSON.parse(localStorage.getItem('gemelo-guide-progress') ?? '[]') as number[]); } catch { setCompleted([]); }
+    setContextScreen(new URLSearchParams(window.location.search).get('screen') ?? '');
+  }, []);
+
+  const completeStep = (stepId: number) => {
+    setCompleted((previous) => {
+      const next = previous.includes(stepId) ? previous : [...previous, stepId];
+      localStorage.setItem('gemelo-guide-progress', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const filteredSteps = search
     ? steps.filter(
@@ -145,6 +160,17 @@ export default function GuiaPage() {
           g.definition.toLowerCase().includes(search.toLowerCase())
       )
     : glossary;
+  const contextText = contextScreen.endsWith('/luz')
+    ? 'En Luz, ingresa los kWh de la factura y confirma el mes; el total y CO₂ mostrados son referenciales.'
+    : contextScreen.endsWith('/futuro')
+      ? 'En Futuro, compara la tendencia con su rango y luego modifica los porcentajes para probar un escenario.'
+      : contextScreen.endsWith('/registrar') || contextScreen.endsWith('/escaneo')
+        ? 'En Registro, confirma categoría y monto. El OCR solo propone datos; la factura se guarda al confirmar.'
+        : contextScreen.endsWith('/presupuesto')
+          ? 'En Presupuesto, define el ingreso y revisa saldos de cuentas, metas y distribución mensual.'
+          : contextScreen.endsWith('/logros')
+            ? 'En Logros, revisa tu nivel, los puntos que faltan y la actividad que los generó.'
+            : 'En Inicio, revisa el saldo disponible, alertas, avance del presupuesto y huella del mes.';
 
   return (
     <div className="space-y-8 animate-fade-in max-w-3xl">
@@ -152,18 +178,24 @@ export default function GuiaPage() {
       <div>
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-forest-50 dark:bg-forest-950 flex items-center justify-center">
-            <BookOpen className="h-5 w-5 text-forest-600" />
+            <BookOpen className="h-5 w-5 text-forest-600 dark:text-forest-400" />
           </div>
           <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Empieza aqui</h1>
         </div>
-        <p className="text-stone-500 text-sm leading-relaxed max-w-xl">
+        <p className="text-stone-500 text-sm leading-relaxed max-w-xl dark:text-stone-400">
           El Gemelo Digital monitorea tus habitos de consumo del hogar. Registra compras, alimentos y energia para obtener predicciones personalizadas y reducir tu impacto ambiental.
         </p>
       </div>
 
+      <Card variant="flat">
+        <div className="flex items-center justify-between text-sm"><b>Progreso de aprendizaje</b><span>{completed.length} de {steps.length} pasos</span></div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"><div className="h-full bg-forest-600" style={{ width: `${completed.length / steps.length * 100}%` }} /></div>
+      </Card>
+      {contextScreen && <Card variant="flat" className="border-l-4 border-l-sky-600"><p className="text-sm font-semibold">Ayuda contextual: {contextScreen.replace('/app/', '').replace('/app', 'Inicio')}</p><p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{contextText}</p></Card>}
+
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 pointer-events-none dark:text-stone-500" />
         <input
           type="search"
           placeholder="Buscar en la guia..."
@@ -188,21 +220,21 @@ export default function GuiaPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-stone-400 uppercase tracking-wide">
+                      <span className="text-xs font-semibold text-stone-400 uppercase tracking-wide dark:text-stone-500">
                         Paso {step.id}
                       </span>
                     </div>
                     <h3 className="text-base font-semibold text-stone-800 dark:text-stone-100 mb-1">{step.title}</h3>
-                    <p className="text-sm text-stone-500 mb-2 leading-relaxed">{step.description}</p>
+                    <p className="text-sm text-stone-500 mb-2 leading-relaxed dark:text-stone-400">{step.description}</p>
                     <div className="bg-stone-50 dark:bg-stone-800 rounded-lg p-3 mb-3">
                       <p className="text-xs font-medium text-stone-600 dark:text-stone-400 mb-1">Como hacerlo</p>
-                      <p className="text-xs text-stone-500">{step.howTo}</p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400">{step.howTo}</p>
                     </div>
                     <div className="flex items-start gap-1.5 mb-3">
-                      <span className="text-xs font-medium text-forest-600 shrink-0">Ejemplo:</span>
-                      <span className="text-xs text-stone-500">{step.example}</span>
+                      <span className="text-xs font-medium text-forest-600 shrink-0 dark:text-forest-400">Ejemplo:</span>
+                      <span className="text-xs text-stone-500 dark:text-stone-400">{step.example}</span>
                     </div>
-                    <Link href={step.href}>
+                    <Link href={step.href} onClick={() => completeStep(step.id)}>
                       <Button variant="secondary" size="sm" icon={<ChevronRight className="h-4 w-4" />}>
                         Hacerlo ahora
                       </Button>
@@ -243,12 +275,12 @@ export default function GuiaPage() {
                 >
                   <span className="text-sm font-medium text-stone-800 dark:text-stone-100">{faq.q}</span>
                   <ChevronDown
-                    className={['h-4 w-4 text-stone-400 shrink-0 transition-transform', openFaq === i ? 'rotate-180' : ''].join(' ')}
+                    className={['h-4 w-4 text-stone-400 shrink-0 transition-transform dark:text-stone-500', openFaq === i ? 'rotate-180' : ''].join(' ')}
                   />
                 </button>
                 {openFaq === i && (
                   <div className="px-4 pb-4">
-                    <p className="text-sm text-stone-500 leading-relaxed">{faq.a}</p>
+                    <p className="text-sm text-stone-500 leading-relaxed dark:text-stone-400">{faq.a}</p>
                   </div>
                 )}
               </Card>
@@ -265,7 +297,7 @@ export default function GuiaPage() {
             {filteredGlossary.map((item) => (
               <Card key={item.term} variant="flat">
                 <p className="text-sm font-semibold text-forest-700 dark:text-forest-300 mb-1">{item.term}</p>
-                <p className="text-xs text-stone-500 leading-relaxed">{item.definition}</p>
+                <p className="text-xs text-stone-500 leading-relaxed dark:text-stone-400">{item.definition}</p>
               </Card>
             ))}
           </div>
@@ -273,7 +305,7 @@ export default function GuiaPage() {
       )}
 
       {filteredSteps.length === 0 && filteredFaqs.length === 0 && filteredGlossary.length === 0 && (
-        <p className="text-center text-stone-400 py-12">Sin resultados para "{search}"</p>
+        <p className="text-center text-stone-400 py-12 dark:text-stone-500">Sin resultados para "{search}"</p>
       )}
     </div>
   );

@@ -28,12 +28,22 @@ export class FoodController {
     return this.foodService.getWasteSummary(householdId);
   }
 
+  @Post('reminders')
+  createReminder(@Body() body: { householdId?: string; name: string; expiresAt: string }) {
+    return this.foodService.createReminder(body);
+  }
+
+  @Get('reminders')
+  getReminders(@Query('householdId') householdId = 'hogar_001') {
+    return this.foodService.getReminders(householdId);
+  }
+
   @Patch(':id/status')
   async updateStatus(
     @Param('id') id: string,
-    @Body('status') status: string,
+    @Body() body: { status: string; occurredAt?: string },
   ) {
-    return this.foodService.updateStatus(id, status);
+    return this.foodService.updateStatus(id, body.status, body.occurredAt);
   }
 }
 

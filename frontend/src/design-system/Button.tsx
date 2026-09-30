@@ -13,14 +13,16 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
+  // brand-700 (#1F4D3A) instead of forest-600: white on forest-600 is only
+  // 3.3:1, which fails AA for button labels under 18.66px.
   primary:
-    'bg-forest-600 text-white hover:bg-forest-700 active:bg-forest-800 focus-visible:ring-forest-500 shadow-sm',
+    'bg-brand-700 text-white hover:bg-brand-800 active:bg-brand-900 focus-visible:ring-brand-600 shadow-sm',
   secondary:
     'bg-forest-50 text-forest-700 hover:bg-forest-100 active:bg-forest-200 focus-visible:ring-forest-400 border border-forest-200 dark:bg-forest-950 dark:text-forest-300 dark:border-forest-800 dark:hover:bg-forest-900',
   ghost:
     'bg-transparent text-stone-600 hover:bg-stone-100 active:bg-stone-200 focus-visible:ring-stone-400 dark:text-stone-300 dark:hover:bg-stone-800',
   danger:
-    'bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 focus-visible:ring-rose-500 shadow-sm',
+    'bg-rose-700 text-white hover:bg-rose-800 active:bg-rose-900 focus-visible:ring-rose-600 shadow-sm',
 };
 
 const sizeClasses: Record<Size, string> = {

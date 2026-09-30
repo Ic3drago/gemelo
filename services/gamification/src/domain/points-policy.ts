@@ -18,6 +18,7 @@ export class PointsPolicy {
 
   /** Puntos por registrar una compra */
   static readonly POINTS_PURCHASE = 5;
+  static readonly POINTS_BILL_SAVED = 3;
 
   /** Puntos por lectura energética eficiente (< ENERGY_EFFICIENT_THRESHOLD kWh) */
   static readonly POINTS_ENERGY_EFFICIENT = 15;
@@ -41,6 +42,10 @@ export class PointsPolicy {
       points: PointsPolicy.POINTS_PURCHASE,
       reason: `Compra registrada: ${item}`,
     };
+  }
+
+  static forBillSaved(): PointsAward {
+    return { points: PointsPolicy.POINTS_BILL_SAVED, reason: 'Factura de luz registrada' };
   }
 
   static forEnergyReading(kWh: number): PointsAward {

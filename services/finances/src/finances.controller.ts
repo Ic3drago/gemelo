@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Query } from '@nestjs/common';
 import { FinancesService } from './finances.service';
 
 @Controller('finances')
@@ -44,5 +44,15 @@ export class FinancesController {
   @Post('budgets')
   createBudget(@Body() body: any) {
     return this.financesService.createBudget(body);
+  }
+
+  @Get('budget')
+  getHouseholdBudget(@Query('householdId') householdId?: string) {
+    return this.financesService.getHouseholdBudget(householdId);
+  }
+
+  @Put('budget')
+  setHouseholdBudget(@Body() body: { householdId?: string; income: number }) {
+    return this.financesService.setHouseholdBudget(body);
   }
 }

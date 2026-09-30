@@ -60,7 +60,11 @@ export class GamificationService {
     const profile = await this.getOrCreateProfile(householdId);
     const achievements = await this.getAchievements(householdId);
     const unlockedAchievements = achievements.filter(a => a.isUnlocked);
-    return { ...profile, unlockedAchievements };
+    return {
+      ...profile,
+      pointsToNextLevel: LevelingPolicy.pointsToNextLevel(profile.points),
+      unlockedAchievements,
+    };
   }
 
   async getAchievements(householdId: string) {
@@ -74,6 +78,10 @@ export class GamificationService {
       order: { timestamp: 'DESC' },
       take: 50,
     });
+  }
+
+  getLeaderboard() {
+    return this.profileRepo.find({ order: { points: 'DESC' }, take: 20 });
   }
 
   async checkAchievements(householdId: string, profile?: GamificationProfile) {

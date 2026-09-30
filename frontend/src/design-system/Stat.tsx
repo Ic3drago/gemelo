@@ -54,11 +54,11 @@ export function Stat({ label, value, unit, prefix, icon, trend, className = '', 
       <div>
         <p className="text-sm text-stone-500 dark:text-stone-400 font-medium">{label}</p>
         <div className="flex items-baseline gap-1 mt-0.5">
-          {prefix && <span className="text-base text-stone-500">{prefix}</span>}
+          {prefix && <span className="text-base text-stone-500 dark:text-stone-400">{prefix}</span>}
           <span className="text-3xl font-bold text-stone-900 dark:text-stone-50 nums tabular-nums">
             {animated.toLocaleString('es-BO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
           </span>
-          {unit && <span className="text-sm text-stone-400">{unit}</span>}
+          {unit && <span className="text-sm text-stone-400 dark:text-stone-500">{unit}</span>}
         </div>
         {trend !== undefined && (
           <div className={`inline-flex items-center gap-0.5 text-xs font-medium mt-1 ${trend >= 0 ? 'text-forest-600' : 'text-rose-600'}`}>

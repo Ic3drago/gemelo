@@ -29,6 +29,7 @@ export class EventConsumerService implements OnModuleInit {
 
         const q = await channel.assertQueue('gamification.events', { durable: true });
         await channel.bindQueue(q.queue, exchange, 'purchase.registered');
+        await channel.bindQueue(q.queue, exchange, 'bill.saved');
         await channel.bindQueue(q.queue, exchange, 'energy.reading');
         await channel.bindQueue(q.queue, exchange, 'food.consumed');
         await channel.bindQueue(q.queue, exchange, 'food.wasted');
@@ -76,8 +77,13 @@ export class EventConsumerService implements OnModuleInit {
       case 'purchase.registered':
         award = PointsPolicy.forPurchase(content.item || 'Producto');
         break;
+      case 'bill.saved':
+        award = PointsPolicy.forBillSaved();
+        break;
       case 'energy.reading':
-        award = PointsPolicy.forEnergyReading(content.kWh || 0);
+        if (content.deviceType !== 'bill') {
+          award = PointsPolicy.forEnergyReading(content.kWh || 0);
+        }
         break;
       case 'food.consumed':
         award = PointsPolicy.forFoodConsumed(content.name || 'Alimento');

@@ -10,11 +10,15 @@ import { Skeleton } from '@/design-system/Skeleton';
 
 type Step = 'capture' | 'processing' | 'review';
 
-interface ScannedItem { name: string; price: string }
+interface ScannedItem { name: string; price: string; category?: string; perishability?: boolean; estimatedExpiryDays?: number | null }
 interface ScannedData {
   store: string;
   date: string;
   total: string;
+  nit: string;
+  number: string;
+  category: string;
+  confidence: string;
   items: ScannedItem[];
 }
 
@@ -70,11 +74,15 @@ export default function EscanearPage() {
       }
 
       setScannedData({
-        store: '',
+        store: invoice.store ?? '',
         date: toIsoDate(invoice.date),
         total: String(invoice.total).replace(',', '.'),
+        nit: invoice.nit ?? '',
+        number: invoice.number ?? '',
+        category: invoice.category ?? 'alimentos',
+        confidence: String(result.confidence ?? 'low'),
         items: Array.isArray(invoice.items)
-          ? invoice.items.map((item: any) => ({ name: item.name, price: String(item.price).replace(',', '.') }))
+          ? invoice.items.map((item: any) => ({ name: item.name, price: String(item.price).replace(',', '.'), category: ['alimentos', 'servicios', 'transporte', 'ocio', 'hogar'].includes(item.category) ? item.category : item.category === 'limpieza' ? 'hogar' : 'alimentos', perishability: item.perishability, estimatedExpiryDays: item.estimatedExpiryDays }))
           : [],
       });
       setScanError(null);
@@ -86,7 +94,10 @@ export default function EscanearPage() {
   };
 
   const handleSave = async () => {
-    if (!scannedData) return;
+    if (!scannedData || !Number.isFinite(Number(scannedData.total)) || Number(scannedData.total) <= 0) {
+      setScanError('El total debe ser mayor que cero antes de confirmar.');
+      return;
+    }
     setSaving(true);
     try {
       const result = await api.saveInvoice({
@@ -99,7 +110,7 @@ export default function EscanearPage() {
         setSaving(false);
         return;
       }
-      router.push('/');
+      router.push('/app');
     } catch {
       setSaving(false);
     }
@@ -120,14 +131,14 @@ export default function EscanearPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="w-10 h-10 rounded-xl border border-stone-200 dark:border-stone-700 flex items-center justify-center text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+          className="w-10 h-10 rounded-xl border border-stone-200 dark:border-stone-700 flex items-center justify-center text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors dark:text-stone-400"
           aria-label="Volver"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div>
           <h1 className="text-xl font-bold text-stone-900 dark:text-stone-50">Escanear factura</h1>
-          <p className="text-xs text-stone-400">Extrae datos automaticamente con OCR</p>
+          <p className="text-xs text-stone-400 dark:text-stone-500">Extrae datos automaticamente con OCR</p>
         </div>
       </div>
 
@@ -138,10 +149,11 @@ export default function EscanearPage() {
           {/* Camera preview / dropzone */}
           <div className="relative bg-stone-100 dark:bg-stone-800 aspect-[3/4] flex items-center justify-center">
             {preview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={preview} alt="Vista previa" className="w-full h-full object-contain" />
+              file?.type === 'application/pdf' ? <div className="px-6 text-center"><ScanLine className="mx-auto h-10 w-10 text-sky-700 dark:text-sky-300" /><p className="mt-3 text-sm font-semibold">{file.name}</p><p className="mt-1 text-xs text-stone-500 dark:text-stone-400">PDF seleccionado. Completa los datos manualmente y confirma.</p></div> :
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview} alt="Vista previa de la factura" className="w-full h-full object-contain" />
             ) : (
-              <div className="flex flex-col items-center gap-3 text-stone-400">
+              <div className="flex flex-col items-center gap-3 text-stone-400 dark:text-stone-500">
                 {/* Guide frame overlay */}
                 <svg width="180" height="240" viewBox="0 0 180 240" fill="none" aria-hidden="true">
                   <rect x="1" y="1" width="178" height="238" rx="8" stroke="currentColor" strokeWidth="2" strokeDasharray="10 6" />
@@ -161,7 +173,7 @@ export default function EscanearPage() {
             <input
               ref={cameraInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               capture="environment"
               className="sr-only"
               onChange={handleCameraInput}
@@ -170,7 +182,7 @@ export default function EscanearPage() {
             <input
               ref={galleryInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               className="sr-only"
               onChange={handleGalleryInput}
               aria-label="Elegir de galeria"
@@ -205,6 +217,9 @@ export default function EscanearPage() {
                 Extraer datos
               </Button>
             )}
+            <Button variant="ghost" size="md" fullWidth onClick={() => { setScannedData({ store: '', date: '', total: '', nit: '', number: '', category: 'alimentos', confidence: 'manual', items: [] }); setStep('review'); }}>
+              Ingresar datos manualmente
+            </Button>
           </div>
         </Card>
       )}
@@ -218,7 +233,7 @@ export default function EscanearPage() {
             </div>
             <div>
               <p className="text-sm font-semibold text-stone-800 dark:text-stone-100">Procesando OCR...</p>
-              <p className="text-xs text-stone-400">Extrayendo datos de la imagen</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500">Extrayendo datos de la imagen</p>
             </div>
           </div>
           <div className="space-y-2.5">
@@ -234,9 +249,9 @@ export default function EscanearPage() {
       {step === 'review' && scannedData && (
         <Card variant="flat" className="space-y-4 animate-fade-in">
           <div className="flex items-center gap-2 p-3 bg-forest-50 dark:bg-forest-950 rounded-xl border border-forest-100 dark:border-forest-900">
-            <CheckCircle2 className="h-4 w-4 text-forest-600 shrink-0" />
-            <p className="text-sm text-forest-700 dark:text-forest-300 font-medium">
-              Datos extraidos. Revisa y edita si es necesario.
+            <CheckCircle2 className="h-4 w-4 text-forest-600 shrink-0 dark:text-forest-400" />
+              <p className="text-sm text-forest-700 dark:text-forest-300 font-medium">
+              Datos extraídos ({scannedData.confidence}). Revisa y corrige antes de confirmar.
             </p>
           </div>
 
@@ -282,6 +297,12 @@ export default function EscanearPage() {
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div><label htmlFor="invoice-nit" className="mb-1 block text-sm font-medium">NIT</label><input id="invoice-nit" className="input-base" value={scannedData.nit} onChange={(e) => setScannedData({ ...scannedData, nit: e.target.value })} /></div>
+              <div><label htmlFor="invoice-number" className="mb-1 block text-sm font-medium">N.º de factura</label><input id="invoice-number" className="input-base" value={scannedData.number} onChange={(e) => setScannedData({ ...scannedData, number: e.target.value })} /></div>
+            </div>
+            <div><label htmlFor="invoice-category" className="mb-1 block text-sm font-medium">Categoría principal</label><select id="invoice-category" className="input-base" value={scannedData.category} onChange={(e) => setScannedData({ ...scannedData, category: e.target.value })}><option value="alimentos">Alimentos</option><option value="servicios">Servicios</option><option value="transporte">Transporte</option><option value="ocio">Ocio</option><option value="hogar">Hogar</option></select></div>
           </div>
 
           {scannedData.items.length > 0 && (
@@ -290,12 +311,17 @@ export default function EscanearPage() {
                 Items identificados ({scannedData.items.length})
               </h3>
               <ul className="divide-y divide-stone-100 dark:divide-stone-800">
-                {scannedData.items.map((item, i) => (
-                  <li key={i} className="flex justify-between py-2 text-sm">
-                    <span className="text-stone-600 dark:text-stone-400">{item.name}</span>
-                    <span className="text-stone-800 dark:text-stone-200 font-medium nums">
-                      Bs {item.price}
-                    </span>
+                    {scannedData.items.map((item, i) => (
+                      <li key={i} className="space-y-2 py-3 text-sm">
+                        <div className="grid grid-cols-[1fr_110px] gap-2">
+                          <input aria-label={`Nombre del ítem ${i + 1}`} className="input-base" value={item.name} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, name: event.target.value } : entry) })} />
+                          <input aria-label={`Precio del ítem ${i + 1}`} className="input-base" type="number" min="0" step="0.01" value={item.price} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, price: event.target.value } : entry) })} />
+                        </div>
+                        <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+                          <select aria-label={`Categoría del ítem ${i + 1}`} className="input-base" value={item.category ?? 'alimentos'} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, category: event.target.value } : entry) })}><option value="alimentos">Alimentos</option><option value="servicios">Servicios</option><option value="transporte">Transporte</option><option value="ocio">Ocio</option><option value="hogar">Hogar</option></select>
+                          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={Boolean(item.perishability)} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, perishability: event.target.checked, estimatedExpiryDays: event.target.checked ? entry.estimatedExpiryDays ?? 5 : null } : entry) })} /> Perecible</label>
+                        </div>
+                        {item.perishability && <label className="block text-xs text-stone-500 dark:text-stone-400">Avisar en (días)<input type="number" min="1" max="60" className="input-base mt-1" value={item.estimatedExpiryDays ?? 5} onChange={(event) => setScannedData({ ...scannedData, items: scannedData.items.map((entry, index) => index === i ? { ...entry, estimatedExpiryDays: Number(event.target.value) } : entry) })} /></label>}
                   </li>
                 ))}
               </ul>

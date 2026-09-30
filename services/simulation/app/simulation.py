@@ -51,6 +51,7 @@ class DataFetcher:
             "purchases":  list(FALLBACK_DATA["purchases"]),
             "energy":     list(FALLBACK_DATA["energy"]),
             "food_waste": list(FALLBACK_DATA["food_waste"]),
+            "co2": [],
         }
 
         async with httpx.AsyncClient() as client:
@@ -62,9 +63,24 @@ class DataFetcher:
                 if res.status_code == 200:
                     summary = res.json()
                     if summary:
-                        data["purchases"] = [s.get("totalAmount", 0) for s in summary]
+                        monthly = {}
+                        for row in summary if isinstance(summary, list) else []:
+                            month = row.get("month")
+                            if month:
+                                bucket = monthly.setdefault(month, {"purchases": 0.0, "co2": 0.0})
+                                bucket["purchases"] += float(row.get("totalBs", 0) or 0)
+                                bucket["co2"] += float(row.get("totalCo2Kg", 0) or 0)
+                        if monthly:
+                            data["purchases"] = [monthly[month]["purchases"] for month in sorted(monthly)]
+                            purchase_co2 = {month: values["co2"] for month, values in monthly.items()}
+                        else:
+                            purchase_co2 = {}
+                    else:
+                        purchase_co2 = {}
+                else:
+                    purchase_co2 = {}
             except Exception:
-                pass
+                purchase_co2 = {}
 
             try:
                 res = await client.get(
@@ -73,10 +89,16 @@ class DataFetcher:
                 )
                 if res.status_code == 200:
                     summary = res.json()
-                    if summary:
-                        data["energy"] = [s.get("totalKWh", 0) for s in summary]
+                    rows = summary.get("summary", []) if isinstance(summary, dict) else summary
+                    if rows:
+                        data["energy"] = [float(row.get("totalKwh", row.get("totalKWh", 0)) or 0) for row in rows]
+                        energy_co2 = {row["month"]: float(row.get("totalCo2", 0) or 0) for row in rows if row.get("month")}
+                    else:
+                        energy_co2 = {}
+                else:
+                    energy_co2 = {}
             except Exception:
-                pass
+                energy_co2 = {}
 
             try:
                 res = await client.get(
@@ -85,10 +107,30 @@ class DataFetcher:
                 )
                 if res.status_code == 200:
                     summary = res.json()
-                    if summary:
-                        data["food_waste"] = [s.get("totalWasteKg", 0) for s in summary]
+                    rows = summary.get("summary", []) if isinstance(summary, dict) else summary
+                    if rows:
+                        data["food_waste"] = [float(row.get("totalKg", row.get("totalWasteKg", 0)) or 0) for row in rows]
+                        waste_co2 = {row["month"]: float(row.get("totalCo2", 0) or 0) for row in rows if row.get("month")}
+                    else:
+                        waste_co2 = {}
+                else:
+                    waste_co2 = {}
             except Exception:
-                pass
+                waste_co2 = {}
+
+        months = sorted(set(purchase_co2) | set(energy_co2) | set(waste_co2))
+        if months:
+            data["co2"] = [
+                purchase_co2.get(month, 0.0)
+                + energy_co2.get(month, 0.0)
+                + waste_co2.get(month, 0.0)
+                for month in months
+            ]
+        else:
+            data["co2"] = [
+                CarbonFactors.total_co2(purchase, energy, waste)
+                for purchase, energy, waste in zip(data["purchases"], data["energy"], data["food_waste"])
+            ]
 
         return data
 
@@ -144,7 +186,7 @@ class SimulationEngine:
     def get_predictions(self, values: list, horizon_months: int) -> dict:
         """
         Proyecta `values` hacia adelante `horizon_months` meses.
-        Usa regresión lineal si hay ≥ 8 puntos; promedio móvil en caso contrario.
+        Ajusta una regresión lineal y marca la estimación como preliminar con menos de 8 puntos.
         """
         n = len(values)
         if n == 0:
@@ -153,24 +195,33 @@ class SimulationEngine:
 
         is_preliminary = n < 8
 
-        if is_preliminary:
-            avg   = np.mean(values)
-            trend = (values[-1] - values[0]) / n if n > 1 else 0
-            preds = [max(0, avg + trend * i) for i in range(1, horizon_months + 1)]
-            std_dev = np.std(values) if n > 1 else avg * 0.1
-        else:
+        if n > 1:
             X = np.array(range(n)).reshape(-1, 1)
             y = np.array(values)
             model = LinearRegression()
             model.fit(X, y)
             X_pred  = np.array(range(n, n + horizon_months)).reshape(-1, 1)
             preds   = [max(0, v) for v in model.predict(X_pred).tolist()]
-            std_dev = np.sqrt(np.var(y - model.predict(X)))
+            residual_std_dev = float(np.std(y - model.predict(X)))
+        else:
+            preds = [max(0, float(values[0]))] * horizon_months
+            residual_std_dev = abs(float(values[0])) * 0.1
+
+        if n > 1 and is_preliminary:
+            residual_std_dev = max(residual_std_dev, float(np.std(values)))
+
+        def lower_band(prediction: float, deviations: float) -> float:
+            return max(0.0, prediction - deviations * residual_std_dev)
 
         return {
             "predictions":  preds,
-            "best":         [max(0, p - std_dev) for p in preds],
-            "worst":        [p + std_dev for p in preds],
+            "best":         [lower_band(p, 1) for p in preds],
+            "worst":        [p + residual_std_dev for p in preds],
+            "lo":           [lower_band(p, 1) for p in preds],
+            "hi":           [p + residual_std_dev for p in preds],
+            "lo3":          [lower_band(p, 3) for p in preds],
+            "hi3":          [p + 3 * residual_std_dev for p in preds],
+            "residualStdDev": residual_std_dev,
             "is_preliminary": is_preliminary,
         }
 
@@ -220,8 +271,10 @@ class SimulationEngine:
         )
 
         # Ahorros económicos en Bs
+        baseline_energy_bills = sum(CarbonFactors.electricity_bill(value) for value in baseline["energyKWh"])
+        scenario_energy_bills = sum(CarbonFactors.electricity_bill(value) for value in scenario["energyKWh"])
         total_bs_saved = (
-            energy_saved   * CarbonFactors.BS_SAVINGS_PER_KWH
+            max(0, baseline_energy_bills - scenario_energy_bills)
             + waste_saved  * CarbonFactors.BS_SAVINGS_PER_KG_WASTE
             + purchase_saved
         )
@@ -236,12 +289,14 @@ class SimulationEngine:
     # ── Casos de uso públicos ─────────────────────────────────────────────────
 
     async def predict(self, household_id: str) -> dict:
-        data    = await self._fetch_data(household_id)
+        data = {key: values[-6:] for key, values in (await self._fetch_data(household_id)).items()}
         horizons = [1, 3, 6]
         result  = {}
 
         for category, values in data.items():
-            cat_result = {"anomaly": self.detect_anomalies(values)}
+            if not values:
+                continue
+            cat_result = {"anomaly": self.detect_anomalies(values), "history": values[-6:]}
             for h in horizons:
                 cat_result[f"months_{h}"] = self.get_predictions(values, h)
             result[category] = cat_result
@@ -253,11 +308,12 @@ class SimulationEngine:
         return result
 
     async def run(self, params) -> dict:
-        data = await self._fetch_data(params.householdId)
+        data = {key: values[-6:] for key, values in (await self._fetch_data(params.householdId)).items()}
 
         proj_purchases = self.project_metric(data["purchases"],  params.horizonMonths)
         proj_energy    = self.project_metric(data["energy"],     params.horizonMonths)
         proj_waste     = self.project_metric(data["food_waste"], params.horizonMonths)
+        proj_co2       = self.project_metric(data.get("co2", []), params.horizonMonths)
 
         scen_purchases = self.apply_reduction(proj_purchases, params.purchaseChangePct)
         scen_energy    = self.apply_reduction(proj_energy,    params.energyReductionPct)
@@ -281,7 +337,7 @@ class SimulationEngine:
             "purchasesBs":  [round(x, 2) for x in proj_purchases],
             "energyKWh":    [round(x, 2) for x in proj_energy],
             "foodWasteKg":  [round(x, 2) for x in proj_waste],
-            "co2Kg":        calc_co2_series(proj_purchases, proj_energy, proj_waste),
+            "co2Kg":        [round(x, 2) for x in proj_co2] if proj_co2 else calc_co2_series(proj_purchases, proj_energy, proj_waste),
         }
 
         scenario = {

@@ -46,13 +46,9 @@ export class LevelingPolicy {
    * Retorna 0 si ya está en el nivel máximo.
    */
   static pointsToNextLevel(points: number): number {
-    for (let i = 0; i < LevelingPolicy.POINTS_PER_THRESHOLD.length - 1; i++) {
-      if (points < LevelingPolicy.POINTS_PER_THRESHOLD[i]) {
-        // El siguiente umbral alcanzable es el que está justo por encima
-        const previousThreshold = LevelingPolicy.POINTS_PER_THRESHOLD[i];
-        return previousThreshold - points;
-      }
-    }
-    return 0; // nivel máximo alcanzado
+    const nextThresholdByLevel = [101, 501, 1501];
+    const level = LevelingPolicy.computeLevel(points).level;
+    const nextThreshold = nextThresholdByLevel[level - 1];
+    return nextThreshold === undefined ? 0 : Math.max(0, nextThreshold - points);
   }
 }

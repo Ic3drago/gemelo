@@ -53,7 +53,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
             <h2 className="text-base font-semibold text-stone-900 dark:text-stone-50">{title}</h2>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+              className="rounded-lg p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors dark:text-stone-500"
               aria-label="Cerrar"
             >
               <X className="h-5 w-5" />

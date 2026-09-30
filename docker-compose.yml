@@ -185,7 +185,10 @@ services:
 
   # ── Frontend (Next.js) ─────────────────────────────────────
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
     ports:
       - "4000:4000"
     environment:
