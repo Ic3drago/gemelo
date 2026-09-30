@@ -27,6 +27,10 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
   // which makes it the containing block for `position: fixed`. The sheet then
   // anchored to the wrong box and opened half off-screen, with its first
   // controls unreachable at a negative y.
+  //
+  // `.sheet-scrim` and `.sheet-panel` put the scrim and the panel back inside
+  // the 720px device column on wide screens, so escaping the frame does not
+  // make them span the whole desktop window.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -36,7 +40,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity"
+        className="sheet-scrim bg-black/40 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -44,9 +48,8 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       {/* Sheet */}
       <div
         className={[
-          'fixed bottom-0 inset-x-0 z-50 rounded-t-3xl bg-white dark:bg-stone-900 shadow-xl',
+          'sheet-panel rounded-t-3xl bg-white dark:bg-stone-900 shadow-xl',
           'flex flex-col h-[90vh] max-h-[90vh] transition-transform duration-300',
-          open ? 'translate-y-0' : 'translate-y-full',
         ].join(' ')}
         role="dialog"
         aria-modal="true"

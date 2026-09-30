@@ -19,7 +19,7 @@ const INCOME_PRESETS = [
   { description: 'Trabajo independiente', category: 'savings' },
   { description: 'Venta de casa', category: 'savings' },
   { description: 'Pensión', category: 'savings' },
-  { description: 'Bono /quete', category: 'savings' },
+  { description: 'Bono de alquiler', category: 'savings' },
   { description: 'Devolución de impuestos', category: 'savings' },
 ] as const;
 
