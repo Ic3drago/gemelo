@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
 
-// `standalone` is only needed by the Docker images (they copy
-// .next/standalone into the runtime stage). On Vercel the platform builds
-// and runs Next.js itself, and standalone output only confuses its builder,
-// so we disable it there.
+// `standalone` is required in both places. The Docker images copy
+// .next/standalone into the runtime stage, and Vercel serves the build from
+// the same directory. Disabling it on Vercel left the CSS and JS chunks
+// outside the served tree, so every asset 404'd and the page rendered with no
+// styles before the client threw.
 const nextConfig = {
-  output: process.env.VERCEL ? undefined : 'standalone',
+  output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
 

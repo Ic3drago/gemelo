@@ -175,7 +175,7 @@ Conecta el repositorio en Vercel y define estas variables de entorno:
 
 Si no defines ninguna, la app detecta que no hay URL válida y entra en modo demo por su cuenta, así que el deploy nunca queda en blanco esperando un gateway inexistente.
 
-Dos detalles propios de Vercel: `next.config.js` desactiva el `output: 'standalone'` cuando detecta `VERCEL`, porque Vercel sirve el build por su cuenta; y las variables `NEXT_PUBLIC_*` se **incrustan durante el build**, por lo que cambiarlas exige redeploy, no un simple reinicio.
+Dos detalles propios de Vercel: `vercel.json` no declara `outputDirectory` porque en un proyecto Next.js eso hace que Vercel trate la carpeta como salida estática y pierda los assets de `/_next`; y las variables `NEXT_PUBLIC_*` se **incrustan durante el build**, por lo que cambiarlas exige redeploy, no un simple reinicio.
 
 ## Despliegue con Docker
 
