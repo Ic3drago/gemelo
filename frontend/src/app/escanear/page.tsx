@@ -74,30 +74,41 @@ export default function EscanearPage() {
       const formData = new FormData();
       formData.append('invoice', file);
       const result = await api.scanInvoice(formData) as any;
-      const invoice = result?.data;
-      if (!result?.success || !invoice || !invoice.total) {
-        setScanError('No se pudo leer el total de esta factura. Prueba con una imagen mas nitida.');
-        setStep('capture');
-        return;
+      const invoice = result?.data ?? {};
+
+      if (!result?.success) {
+        setScanError('No se pudo procesar la factura. Puedes corregir los datos manualmente en la siguiente pantalla.');
       }
 
-      setScannedData({
+      const fallback = {
         store: invoice.store ?? '',
         date: toIsoDate(invoice.date),
-        total: String(invoice.total).replace(',', '.'),
+        total: invoice.total ? String(invoice.total).replace(',', '.') : '',
         nit: invoice.nit ?? '',
         number: invoice.number ?? '',
-        category: invoice.category ?? 'alimentos',
-        confidence: String(result.confidence ?? 'low'),
+        category: invoice.category ?? 'hogar',
+        confidence: String(result?.confidence ?? 'low'),
         items: Array.isArray(invoice.items)
-          ? invoice.items.map((item: any) => ({ name: item.name, price: String(item.price).replace(',', '.'), category: ['alimentos', 'servicios', 'transporte', 'ocio', 'hogar'].includes(item.category) ? item.category : item.category === 'limpieza' ? 'hogar' : 'alimentos', perishability: item.perishability, estimatedExpiryDays: item.estimatedExpiryDays }))
+          ? invoice.items.map((item: any) => ({ name: item.name ?? '', price: item.price ? String(item.price).replace(',', '.') : '0', category: ['alimentos', 'servicios', 'transporte', 'ocio', 'hogar'].includes(item.category) ? item.category : 'hogar', perishability: Boolean(item.perishability), estimatedExpiryDays: item.estimatedExpiryDays ?? (item.perishability ? 5 : null) }))
           : [],
-      });
-      setScanError(null);
+      };
+
+      setScannedData(fallback);
+      setScanError(result?.success && !invoice.total ? 'No se pudo leer el total con confianza. Revisa y completa los datos manualmente antes de guardar.' : null);
       setStep('review');
     } catch {
-      setScanError('No se pudo procesar la imagen. Intenta nuevamente.');
-      setStep('capture');
+      setScanError('No se pudo procesar la imagen. Puedes ingresar los datos manualmente en la siguiente pantalla.');
+      setScannedData({
+        store: '',
+        date: '',
+        total: '',
+        nit: '',
+        number: '',
+        category: 'hogar',
+        confidence: 'low',
+        items: [],
+      });
+      setStep('review');
     }
   };
 
@@ -233,7 +244,7 @@ export default function EscanearPage() {
                 en <code>localhost</code>.
               </p>
             )}
-            <Button variant="ghost" size="md" fullWidth onClick={() => { setScannedData({ store: '', date: '', total: '', nit: '', number: '', category: 'alimentos', confidence: 'manual', items: [] }); setStep('review'); }}>
+            <Button variant="ghost" size="md" fullWidth onClick={() => { setScannedData({ store: '', date: '', total: '', nit: '', number: '', category: 'hogar', confidence: 'manual', items: [] }); setStep('review'); }}>
               Ingresar datos manualmente
             </Button>
           </div>

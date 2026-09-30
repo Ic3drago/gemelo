@@ -6,6 +6,8 @@ Aplicación educativa para observar, proyectar y simular el consumo doméstico, 
 
 ## Arquitectura
 
+Para una explicación detallada de la metodología, la arquitectura, los frameworks y su ubicación en el código, consulta el [informe de metodología y arquitectura](docs/informe-metodologia-arquitectura.md).
+
 ```text
 PWA Next.js :4000 → API Gateway NestJS :3000
                          ├── Compras NestJS :3001 ── PostgreSQL / RabbitMQ
@@ -17,7 +19,7 @@ PWA Next.js :4000 → API Gateway NestJS :3000
                          └── Simulación FastAPI :8000 ─ scikit-learn
 ```
 
-Finanzas permanece como servicio propio porque cuentas, balances, transacciones, recurrencias y metas tienen invariantes independientes de Compras. El gateway agrega lecturas del resto de los servicios para construir el dashboard. PostgreSQL se ejecuta como instancia compartida en desarrollo y cada servicio usa su base lógica.
+Finanzas permanece como servicio propio porque cuentas, balances, transacciones, recurrencias y metas tienen invariantes independientes de Compras. El gateway agrega lecturas del resto de los servicios para construir el dashboard. PostgreSQL se ejecuta como instancia compartida en desarrollo con cinco bases lógicas para los servicios NestJS; Simulación utiliza SQLite.
 
 Los servicios NestJS separan controladores HTTP, servicios de aplicación, entidades y value objects/policies. FastAPI separa las rutas del motor de simulación y de los factores de carbono. RabbitMQ conserva el exchange `household.events` y los contratos existentes.
 
@@ -103,7 +105,7 @@ Son coeficientes simplificados para fines educativos y requieren validación ant
 
 ## Facturas y OCR
 
-Facturas acepta imágenes con Tesseract en español. Los datos extraídos se muestran para revisión y el guardado ocurre solo al confirmar. La pantalla también permite introducirlos manualmente, incluidos datos de PDF: el OCR actual de PDF no está implementado. Los perecibles detectados sugieren una fecha aproximada de cinco días y la confirmación crea un recordatorio pendiente; todavía no hay servicio de notificaciones push.
+Facturas acepta imágenes y PDF. En PDF digital se intenta extraer el texto; las páginas escaneadas se rasterizan y pasan por Tesseract en español. Los datos extraídos se muestran para revisión y el guardado ocurre solo al confirmar. La pantalla también permite corregirlos o introducirlos manualmente. Los perecibles detectados sugieren una fecha aproximada de cinco días y la confirmación crea un recordatorio pendiente; todavía no hay servicio de notificaciones push.
 
 ## Ejecución local y Docker
 
