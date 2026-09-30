@@ -110,17 +110,22 @@ export default function DashboardPage() {
     void load();
   }, []);
 
+  const alertCount = dashboard?.alerts.length ?? 0;
+
+  // Draw attention to alert dots without being noisy; no-ops under reduced
+  // motion. Must stay above the early returns below: a hook called after one
+  // of them changes the hook count between renders, which is React error #310.
+  useEffect(() => {
+    const dots = alertsRef.current?.querySelectorAll('.alert-dot');
+    if (!dots || dots.length === 0) return;
+    return pulse(dots, { scale: 1.5, duration: 1400 });
+  }, [alertCount]);
+
   if (loading) return <div className="space-y-5"><SkeletonCard /><div className="grid grid-cols-2 gap-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div><SkeletonCard /></div>;
   if (failed || !dashboard) return <EmptyState icon={<TrendingUp />} title="No se pudo cargar el resumen" description="Revisa la conexión e inténtalo de nuevo." action={{ label: 'Reintentar', onClick: () => window.location.reload() }} />;
 
   const status = stateStyles[dashboard.status];
   const spentPct = dashboard.total > 0 ? Math.min(100, Math.round(dashboard.spent / dashboard.total * 100)) : 0;
-
-  // Draw attention to alert dots without being noisy; no-ops under reduced motion.
-  useEffect(
-    () => (alertsRef.current ? pulse(alertsRef.current.querySelectorAll('.alert-dot'), { scale: 1.5, duration: 1400 }) : undefined),
-    [dashboard.alerts.length],
-  );
 
   return (
     <div className="space-y-5 animate-fade-in">
