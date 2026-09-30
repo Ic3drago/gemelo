@@ -54,25 +54,27 @@ export class FinancesService {
       );
     }
 
-    const tx = this.transactionRepo.create(data);
-    const saved = await this.transactionRepo.save(tx);
+    const saved = await this.transactionRepo.manager.transaction(async (manager) => {
+      const tx = manager.create(Transaction, data);
 
-    // Actualizar balance a través del comportamiento del agregado Account
-    if (data.accountId) {
-      const acc = await this.accountRepo.findOne({ where: { id: data.accountId } });
-      if (!acc) {
-        throw new NotFoundException(`Cuenta con id ${data.accountId} no encontrada`);
+      if (data.accountId) {
+        const accountRepo = manager.getRepository(Account);
+        const acc = await accountRepo.findOne({ where: { id: data.accountId } });
+        if (!acc) {
+          throw new NotFoundException(`Cuenta con id ${data.accountId} no encontrada`);
+        }
+
+        try {
+          acc.applyTransaction(type, Number(data.amount));
+        } catch (e) {
+          throw new BadRequestException(e.message);
+        }
+
+        await accountRepo.save(acc);
       }
 
-      // La regla de negocio vive en el agregado, no aquí
-      try {
-        acc.applyTransaction(type, Number(data.amount));
-      } catch (e) {
-        throw new BadRequestException(e.message);
-      }
-
-      await this.accountRepo.save(acc);
-    }
+      return manager.save(tx);
+    });
 
     await this.rabbitService.publish('finance.transaction.added', saved);
     return saved;

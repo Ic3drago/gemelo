@@ -33,7 +33,14 @@ async function fetchAPI<T = unknown>(endpoint: string, options: FetchOptions = {
       return null;
     }
 
-    return (await res.json()) as T;
+    const data = (await res.json()) as T;
+    if (data && typeof data === 'object' && 'error' in data && data.error === true) {
+      const apiError = data as { message?: unknown };
+      console.warn(`[API] ${method} ${endpoint} → ${String(apiError.message ?? 'request failed')}`);
+      return null;
+    }
+
+    return data;
   } catch (err) {
     console.error(`[API] ${endpoint}`, err);
     return null;
@@ -57,7 +64,7 @@ export const api = {
     category: string;
     item: string;
     amountBs: number;
-    qty?: number;
+    quantity?: number;
     unit?: string;
   }) => fetchAPI('/api/purchases', { method: 'POST', body: data }),
 
@@ -85,7 +92,7 @@ export const api = {
     householdId: string;
     name: string;
     category: string;
-    qty: number;
+    quantityKg: number;
   }) => fetchAPI('/api/food', { method: 'POST', body: data }),
 
   wasteFood: (id: string) =>
@@ -130,20 +137,23 @@ export const api = {
     fetchAPI(`/api/finances/transactions?householdId=${householdId}${params ? '&' + params : ''}`),
 
   createTransaction: (data: {
-    householdId: string;
+    accountId: string;
     description: string;
-    amountBs: number;
+    amount: number;
     type: 'income' | 'expense';
-    category?: string;
+    category: string;
   }) => fetchAPI('/api/finances/transactions', { method: 'POST', body: data }),
 
   getBudgets: (householdId = 'hogar_001') =>
     fetchAPI(`/api/finances/budgets?householdId=${householdId}`),
 
+  createBudget: (data: { month: string; needsLimit: number; wantsLimit: number; savingsTarget: number }) =>
+    fetchAPI('/api/finances/budgets', { method: 'POST', body: data }),
+
   getGoals: (householdId = 'hogar_001') =>
     fetchAPI(`/api/finances/goals?householdId=${householdId}`),
 
-  createGoal: (data: { householdId: string; name: string; targetBs: number }) =>
+  createGoal: (data: { name: string; targetAmount: number }) =>
     fetchAPI('/api/finances/goals', { method: 'POST', body: data }),
 
   // ── Invoices / OCR ─────────────────────────────────────────────────────────

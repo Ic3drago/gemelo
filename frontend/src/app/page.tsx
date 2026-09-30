@@ -17,7 +17,7 @@ import { SkeletonCard } from '@/design-system/Skeleton';
 import { EmptyState } from '@/design-system/EmptyState';
 import { Button } from '@/design-system/Button';
 
-type Status = 'green' | 'amber' | 'red';
+type Status = 'green' | 'amber' | 'red' | 'none';
 
 interface DashboardData {
   status: Status;
@@ -59,7 +59,21 @@ const statusConfig: Record<Status, { label: string; bg: string; ring: string; te
     ring: 'ring-rose-200',
     text: 'text-rose-700',
   },
+  none: {
+    label: 'Sin presupuesto',
+    bg: 'bg-stone-500',
+    ring: 'ring-stone-200',
+    text: 'text-stone-700',
+  },
 };
+
+function getLevelProgress(points: number, level: number): number {
+  const thresholds = [0, 101, 501, 1501];
+  if (level >= 4) return 100;
+  const start = thresholds[Math.max(0, level - 1)];
+  const next = thresholds[level];
+  return Math.max(0, Math.min(100, Math.round(((points - start) / (next - start)) * 100)));
+}
 
 export default function Home() {
   const router = useRouter();
@@ -70,67 +84,64 @@ export default function Home() {
   useEffect(() => {
     async function load() {
       try {
-        const [dashboard, gamification] = await Promise.all([
+        const [dashboard, gamification, budgetsRaw] = await Promise.all([
           api.getDashboard('hogar_001'),
           api.getProfile('hogar_001'),
+          api.getBudgets('hogar_001'),
         ]);
 
         const d = dashboard as any;
         const g = gamification as any;
-        if (!d && !g) {
-          // Use sensible mock data when backend isn't available
-          setData({
-            status: 'amber',
-            remainingBudget: 1250.50,
-            totalBudget: 4000,
-            spentBudget: 2749.50,
-            monthLabel: new Date().toLocaleString('es-BO', { month: 'long', year: 'numeric' }),
-            stats: { spent: 2749.50, co2: 12.4, waste: 0.8, energy: 145 },
-            trend: [
-              { month: 'Ago', amount: 3100 },
-              { month: 'Sep', amount: 2950 },
-              { month: 'Oct', amount: 3400 },
-              { month: 'Nov', amount: 2800 },
-              { month: 'Dic', amount: 3200 },
-              { month: 'Ene', amount: 2750 },
-            ],
-            gamification: { points: 340, level: 2, levelName: 'Consciente', progress: 60 },
-          });
-        } else {
-          const spent = d?.totalSpent ?? 2749.50;
-          const budget = d?.totalBudget ?? 4000;
-          const remaining = budget - spent;
-          const pct = spent / budget;
-          const status: Status = pct < 0.7 ? 'green' : pct < 0.9 ? 'amber' : 'red';
-
-          setData({
-            status,
-            remainingBudget: remaining,
-            totalBudget: budget,
-            spentBudget: spent,
-            monthLabel: new Date().toLocaleString('es-BO', { month: 'long', year: 'numeric' }),
-            stats: {
-              spent,
-              co2: d?.co2Kg ?? 12.4,
-              waste: d?.wasteKg ?? 0.8,
-              energy: d?.energyKWh ?? 145,
-            },
-            trend: d?.monthlyTrend ?? [
-              { month: 'Ago', amount: 3100 },
-              { month: 'Sep', amount: 2950 },
-              { month: 'Oct', amount: 3400 },
-              { month: 'Nov', amount: 2800 },
-              { month: 'Dic', amount: 3200 },
-              { month: 'Ene', amount: 2750 },
-            ],
-            gamification: {
-              points: g?.points ?? 340,
-              level: g?.level ?? 2,
-              levelName: g?.levelName ?? 'Consciente',
-              progress: g?.progress ?? 60,
-            },
-          });
+        if (!d) {
+          setError(true);
+          return;
         }
+
+        const month = new Date().toISOString().slice(0, 7);
+        const purchases = Array.isArray(d.purchases) ? d.purchases : [];
+        const monthPurchases = purchases.filter((purchase: any) => purchase.month === month);
+        const monthEnergy = (d.energy?.summary ?? []).filter((reading: any) => reading.month === month);
+        const monthFood = (d.food?.summary ?? []).filter((entry: any) => entry.month === month);
+        const spent = monthPurchases.reduce((total: number, purchase: any) => total + Number(purchase.totalBs), 0);
+        const co2FromPurchases = monthPurchases.reduce((total: number, purchase: any) => total + Number(purchase.totalCo2Kg), 0);
+        const energyKwh = monthEnergy.reduce((total: number, reading: any) => total + Number(reading.totalKwh), 0);
+        const energyCo2 = monthEnergy.reduce((total: number, reading: any) => total + Number(reading.totalCo2), 0);
+        const wasteKg = monthFood.reduce((total: number, entry: any) => total + Number(entry.totalKg), 0);
+        const wasteCo2 = monthFood.reduce((total: number, entry: any) => total + Number(entry.totalCo2), 0);
+        const budget = (Array.isArray(budgetsRaw) ? budgetsRaw as any[] : []).find((entry) => entry.month === month);
+        const totalBudget = budget
+          ? Number(budget.needsLimit) + Number(budget.wantsLimit) + Number(budget.savingsTarget)
+          : 0;
+        const pct = totalBudget > 0 ? spent / totalBudget : 0;
+        const trendMap = new Map<string, number>();
+        purchases.forEach((purchase: any) => {
+          trendMap.set(purchase.month, (trendMap.get(purchase.month) ?? 0) + Number(purchase.totalBs));
+        });
+        const trend = Array.from(trendMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([key, amount]) => ({
+          month: new Date(`${key}-01T00:00:00`).toLocaleString('es-BO', { month: 'short' }),
+          amount,
+        }));
+
+        setData({
+          status: totalBudget === 0 ? 'none' : pct < 0.7 ? 'green' : pct < 0.9 ? 'amber' : 'red',
+          remainingBudget: totalBudget - spent,
+          totalBudget,
+          spentBudget: spent,
+          monthLabel: new Date().toLocaleString('es-BO', { month: 'long', year: 'numeric' }),
+          stats: {
+            spent,
+            co2: co2FromPurchases + energyCo2 + wasteCo2,
+            waste: wasteKg,
+            energy: energyKwh,
+          },
+          trend,
+          gamification: {
+            points: g?.points ?? d.gamification?.points ?? 0,
+            level: g?.level ?? d.gamification?.level ?? 1,
+            levelName: g?.levelName ?? d.gamification?.levelName ?? 'Principiante',
+            progress: g?.progress ?? getLevelProgress(Number(g?.points ?? d.gamification?.points ?? 0), Number(g?.level ?? d.gamification?.level ?? 1)),
+          },
+        });
       } catch {
         setError(true);
       } finally {
@@ -192,7 +203,7 @@ export default function Home() {
             <p className="text-sm text-stone-500 mb-1">Presupuesto restante</p>
             <div className="flex items-baseline gap-1">
               <span className="text-4xl font-bold text-stone-900 dark:text-stone-50 nums">
-                {data.remainingBudget.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {data.totalBudget > 0 ? data.remainingBudget.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
               </span>
               <span className="text-lg text-stone-400">Bs</span>
             </div>
@@ -202,16 +213,16 @@ export default function Home() {
           <div>
             <div className="flex justify-between text-xs text-stone-400 mb-1.5">
               <span>Gastado: Bs {data.spentBudget.toLocaleString('es-BO')}</span>
-              <span>{spentPct}% del total</span>
+              <span>{data.totalBudget > 0 ? `${spentPct}% del total` : 'Sin tope mensual'}</span>
             </div>
             <div className="h-2.5 w-full bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
-              <div
+              {data.totalBudget > 0 && <div
                 className={['h-full rounded-full transition-all duration-700', status.bg].join(' ')}
                 style={{ width: `${spentPct}%` }}
-              />
+              />}
             </div>
             <div className="text-right text-xs text-stone-400 mt-1">
-              Meta: Bs {data.totalBudget.toLocaleString('es-BO')}
+              {data.totalBudget > 0 ? `Meta: Bs ${data.totalBudget.toLocaleString('es-BO')}` : 'Meta: sin definir'}
             </div>
           </div>
         </div>
@@ -230,7 +241,7 @@ export default function Home() {
         </Card>
         <Card variant="flat">
           <Stat
-            label="CO2 evitado"
+            label="Huella de CO2"
             value={data.stats.co2}
             unit="kg"
             decimals={1}
