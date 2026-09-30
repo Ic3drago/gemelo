@@ -22,7 +22,7 @@ export class Purchase {
   @Column('decimal', { precision: 10, scale: 3, default: 0 })
   co2EstimateKg: number;
 
-  @Column({ nullable: true })
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
   quantity: number;
 
   @Column({ nullable: true })

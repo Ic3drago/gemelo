@@ -11,6 +11,9 @@ export class Transaction {
   @Column()
   accountId: string;
 
+  @Column({ nullable: true })
+  description: string;
+
   @Column('decimal', { precision: 10, scale: 2 })
   amount: number;
 

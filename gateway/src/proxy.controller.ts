@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('api')
 export class ProxyController {
@@ -115,9 +116,29 @@ export class ProxyController {
 
   // --- Invoices ---
   @Post('invoices/scan')
-  async scanInvoice(@Body() body: any) {
-    // Note: Assuming JSON payload or forwarding raw. If multipart is needed, this simple proxy might need raw body forwarding.
-    return this.forward('POST', `${process.env.INVOICES_URL}/scan`, body);
+  @UseInterceptors(FileInterceptor('invoice'))
+  async scanInvoice(@UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string }) {
+    if (!file) return { error: true, message: 'No se recibió una imagen para escanear' };
+    const formData = new FormData();
+    formData.append('file', new Blob([new Uint8Array(file.buffer)], { type: file.mimetype }), file.originalname);
+    return this.forward('POST', `${process.env.INVOICES_URL}/scan`, formData);
+  }
+
+  @Post('invoices')
+  async saveInvoice(@Body() body: any) {
+    const total = Number(body.total);
+    if (!Number.isFinite(total) || total <= 0) {
+      return { error: true, message: 'El total de la factura debe ser mayor que cero' };
+    }
+    const details = [body.store, body.date].filter(Boolean).join(' - ');
+    return this.forward('POST', `${process.env.PURCHASES_URL}/purchases`, {
+      householdId: body.householdId || 'hogar_001',
+      category: 'supermercado',
+      item: details ? `Factura: ${details}` : 'Factura escaneada',
+      amountBs: total,
+      quantity: 1,
+      unit: 'factura',
+    });
   }
 
   // --- Finances ---

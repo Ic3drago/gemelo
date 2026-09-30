@@ -13,76 +13,147 @@ import { Toast } from '@/design-system/Toast';
 
 interface BudgetRule { label: string; target: number; spent: number; color: string; badgeVariant: 'info' | 'warning' | 'success' }
 interface Goal { id: string; name: string; target: number; current: number }
-interface Tx { id: string; description: string; amountBs: number; date: string; type: 'income' | 'expense' }
+interface Tx { id: string; description: string; amount: number; date: string; type: 'income' | 'expense' }
+interface Account { id: string; name: string; balance: number }
 
 interface FinancesData {
   income: number;
   rules: BudgetRule[];
   goals: Goal[];
   recentTx: Tx[];
+  accounts: Account[];
 }
 
 const pct = (spent: number, target: number) => Math.min(100, Math.round((spent / target) * 100));
 
+async function loadFinancesData(): Promise<FinancesData> {
+  const [accountsRaw, transactionsRaw, goalsRaw, budgetsRaw] = await Promise.all([
+    api.getAccounts(),
+    api.getTransactions(),
+    api.getGoals(),
+    api.getBudgets(),
+  ]);
+  const accounts = Array.isArray(accountsRaw) ? accountsRaw as any[] : [];
+  const transactions = Array.isArray(transactionsRaw) ? transactionsRaw as any[] : [];
+  const goals = Array.isArray(goalsRaw) ? goalsRaw as any[] : [];
+  const budgets = Array.isArray(budgetsRaw) ? budgetsRaw as any[] : [];
+  const month = new Date().toISOString().slice(0, 7);
+  const monthTransactions = transactions.filter((tx) => String(tx.timestamp ?? '').startsWith(month));
+  const budget = budgets.find((item) => item.month === month);
+  const spentFor = (category: string) => monthTransactions
+    .filter((tx) => tx.type === 'expense' && String(tx.category).toLowerCase() === category)
+    .reduce((total, tx) => total + Number(tx.amount), 0);
+
+  return {
+    income: monthTransactions
+      .filter((tx) => tx.type === 'income')
+      .reduce((total, tx) => total + Number(tx.amount), 0),
+    rules: budget ? [
+      { label: 'Necesidades', target: Number(budget.needsLimit), spent: spentFor('needs'), color: '#0284c7', badgeVariant: 'info' },
+      { label: 'Deseos', target: Number(budget.wantsLimit), spent: spentFor('wants'), color: '#d97706', badgeVariant: 'warning' },
+      { label: 'Ahorro', target: Number(budget.savingsTarget), spent: spentFor('savings'), color: '#16a34a', badgeVariant: 'success' },
+    ] : [],
+    goals: goals.map((goal) => ({
+      id: String(goal.id),
+      name: goal.name,
+      target: Number(goal.targetAmount),
+      current: Number(goal.currentAmount),
+    })),
+    recentTx: transactions.slice(0, 5).map((tx) => ({
+      id: String(tx.id),
+      description: tx.description || tx.category,
+      amount: Number(tx.amount),
+      date: tx.timestamp,
+      type: tx.type,
+    })),
+    accounts: accounts.map((account) => ({
+      id: String(account.id),
+      name: account.name,
+      balance: Number(account.balance),
+    })),
+  };
+}
+
 export default function PresupuestoPage() {
   const [data, setData] = useState<FinancesData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [activeSheet, setActiveSheet] = useState<'transaction' | 'goal' | 'budget' | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // New transaction form
-  const [txForm, setTxForm] = useState({ description: '', amount: '', type: 'expense' as 'income' | 'expense' });
+  const [txForm, setTxForm] = useState({ description: '', amount: '', type: 'expense' as 'income' | 'expense', category: 'needs', accountId: '' });
+  const [goalForm, setGoalForm] = useState({ name: '', target: '' });
+  const [budgetForm, setBudgetForm] = useState({ needs: '', wants: '', savings: '' });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const financesRaw = await api.getFinances();
-        const finances = financesRaw as any;
-        if (finances) {
-          const income = finances.totalIncome ?? 5000;
-          setData({
-            income,
-            rules: [
-              { label: 'Necesidades (50%)', target: income * 0.5, spent: finances.needs ?? 2100, color: '#0284c7', badgeVariant: 'info' },
-              { label: 'Deseos (30%)',       target: income * 0.3, spent: finances.wants ?? 1600, color: '#d97706', badgeVariant: 'warning' },
-              { label: 'Ahorro (20%)',       target: income * 0.2, spent: finances.savings ?? 450, color: '#16a34a', badgeVariant: 'success' },
-            ],
-            goals: finances.goals ?? [],
-            recentTx: finances.recentTransactions ?? [],
-          });
-        } else {
-          const income = 5000;
-          setData({
-            income,
-            rules: [
-              { label: 'Necesidades (50%)', target: 2500, spent: 2100, color: '#0284c7', badgeVariant: 'info' },
-              { label: 'Deseos (30%)',       target: 1500, spent: 1600, color: '#d97706', badgeVariant: 'warning' },
-              { label: 'Ahorro (20%)',       target: 1000, spent: 450,  color: '#16a34a', badgeVariant: 'success' },
-            ],
-            goals: [
-              { id: '1', name: 'Fondo de emergencia', target: 5000, current: 1500 },
-              { id: '2', name: 'Vacaciones', target: 3000, current: 600 },
-            ],
-            recentTx: [
-              { id: '1', description: 'Supermercado', amountBs: -345, date: '2025-01-15', type: 'expense' },
-              { id: '2', description: 'Salario',      amountBs: 5000, date: '2025-01-01', type: 'income' },
-            ],
-          });
-        }
-      } catch {
-        // use mock
-      } finally {
-        setLoading(false);
+    loadFinancesData().then((finances) => {
+      setData(finances);
+      if (finances.accounts.length > 0) {
+        setTxForm((current) => ({ ...current, accountId: current.accountId || finances.accounts[0].id }));
       }
-    }
-    load();
+    }).finally(() => setLoading(false));
   }, []);
 
-  const handleAddTx = () => {
-    if (!txForm.description || !txForm.amount) return;
-    setToast('Transaccion registrada');
-    setSheetOpen(false);
-    setTxForm({ description: '', amount: '', type: 'expense' });
+  const handleAddTx = async () => {
+    if (!txForm.description.trim() || Number(txForm.amount) <= 0 || !txForm.accountId) return;
+    setSaving(true);
+    const result = await api.createTransaction({
+      accountId: txForm.accountId,
+      description: txForm.description.trim(),
+      amount: Number(txForm.amount),
+      type: txForm.type,
+      category: txForm.category,
+    });
+    if (!result) {
+      setToast({ message: 'No se pudo registrar la transaccion', type: 'error' });
+      setSaving(false);
+      return;
+    }
+    setData(await loadFinancesData());
+    setToast({ message: 'Transaccion registrada', type: 'success' });
+    setActiveSheet(null);
+    setTxForm((current) => ({ ...current, description: '', amount: '' }));
+    setSaving(false);
+  };
+
+  const handleAddGoal = async () => {
+    if (!goalForm.name.trim() || Number(goalForm.target) <= 0) return;
+    setSaving(true);
+    const result = await api.createGoal({ name: goalForm.name.trim(), targetAmount: Number(goalForm.target) });
+    if (!result) {
+      setToast({ message: 'No se pudo crear la meta', type: 'error' });
+      setSaving(false);
+      return;
+    }
+    setData(await loadFinancesData());
+    setToast({ message: 'Meta creada', type: 'success' });
+    setActiveSheet(null);
+    setGoalForm({ name: '', target: '' });
+    setSaving(false);
+  };
+
+  const handleCreateBudget = async () => {
+    const needsLimit = Number(budgetForm.needs);
+    const wantsLimit = Number(budgetForm.wants);
+    const savingsTarget = Number(budgetForm.savings);
+    if ([needsLimit, wantsLimit, savingsTarget].some((amount) => amount <= 0)) return;
+    setSaving(true);
+    const result = await api.createBudget({
+      month: new Date().toISOString().slice(0, 7),
+      needsLimit,
+      wantsLimit,
+      savingsTarget,
+    });
+    if (!result) {
+      setToast({ message: 'No se pudo guardar el presupuesto', type: 'error' });
+      setSaving(false);
+      return;
+    }
+    setData(await loadFinancesData());
+    setToast({ message: 'Presupuesto mensual guardado', type: 'success' });
+    setActiveSheet(null);
+    setBudgetForm({ needs: '', wants: '', savings: '' });
+    setSaving(false);
   };
 
   if (loading) {
@@ -105,7 +176,7 @@ export default function PresupuestoPage() {
 
   return (
     <div className="space-y-5 animate-fade-in max-w-2xl mx-auto">
-      {toast && <Toast message={toast} type="success" onClose={() => setToast(null)} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="flex items-center justify-between">
         <div>
@@ -116,7 +187,7 @@ export default function PresupuestoPage() {
           variant="primary"
           size="sm"
           icon={<Plus className="h-4 w-4" />}
-          onClick={() => setSheetOpen(true)}
+          onClick={() => setActiveSheet('transaction')}
         >
           Agregar
         </Button>
@@ -124,7 +195,7 @@ export default function PresupuestoPage() {
 
       {/* ── 50/30/20 Overview ── */}
       <Card variant="flat" padding={false}>
-        <div className="flex flex-col md:flex-row items-center gap-4 p-5">
+        {data.rules.length > 0 ? <div className="flex flex-col md:flex-row items-center gap-4 p-5">
           {/* Radial chart */}
           <div className="w-40 h-40 shrink-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -166,7 +237,10 @@ export default function PresupuestoPage() {
               );
             })}
           </div>
-        </div>
+        </div> : <div className="p-5 flex items-center justify-between gap-4">
+          <p className="text-sm text-stone-500">Todavia no hay un presupuesto mensual registrado.</p>
+          <Button variant="secondary" size="sm" onClick={() => setActiveSheet('budget')}>Configurar</Button>
+        </div>}
       </Card>
 
       {/* ── Metas ── */}
@@ -176,6 +250,7 @@ export default function PresupuestoPage() {
           <h2 className="text-base font-semibold text-stone-800 dark:text-stone-100">Metas de ahorro</h2>
         </div>
         <div className="space-y-4">
+          {data.goals.length === 0 && <p className="text-sm text-stone-500">Aun no tienes metas de ahorro.</p>}
           {data.goals.map((goal) => {
             const p = pct(goal.current, goal.target);
             return (
@@ -198,7 +273,7 @@ export default function PresupuestoPage() {
           })}
           <button
             className="w-full h-11 border-2 border-dashed border-stone-200 dark:border-stone-700 rounded-xl text-sm text-stone-500 hover:text-forest-600 hover:border-forest-400 transition-colors"
-            onClick={() => setSheetOpen(true)}
+            onClick={() => setActiveSheet('goal')}
           >
             Crear nueva meta
           </button>
@@ -220,7 +295,7 @@ export default function PresupuestoPage() {
                   <p className="text-xs text-stone-400">{new Date(tx.date).toLocaleDateString('es-BO')}</p>
                 </div>
                 <span className={['text-sm font-semibold nums', tx.type === 'income' ? 'text-forest-600' : 'text-stone-700 dark:text-stone-300'].join(' ')}>
-                  {tx.type === 'income' ? '+' : ''}Bs {Math.abs(tx.amountBs).toLocaleString('es-BO')}
+                  {tx.type === 'income' ? '+' : '-'}Bs {Math.abs(tx.amount).toLocaleString('es-BO')}
                 </span>
               </div>
             ))}
@@ -229,7 +304,34 @@ export default function PresupuestoPage() {
       )}
 
       {/* ── Bottom Sheet: Add transaction ── */}
-      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Nueva transaccion">
+      <BottomSheet open={activeSheet !== null} onClose={() => setActiveSheet(null)} title={activeSheet === 'goal' ? 'Nueva meta de ahorro' : activeSheet === 'budget' ? 'Presupuesto mensual' : 'Nueva transaccion'}>
+        {activeSheet === 'goal' ? (
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
+              Nombre de la meta
+              <input type="text" className="input-base mt-1.5" value={goalForm.name} onChange={(e) => setGoalForm({ ...goalForm, name: e.target.value })} />
+            </label>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300">
+              Monto objetivo (Bs)
+              <input type="number" min="0.01" step="0.01" className="input-base mt-1.5" value={goalForm.target} onChange={(e) => setGoalForm({ ...goalForm, target: e.target.value })} />
+            </label>
+            <Button variant="primary" size="md" fullWidth loading={saving} onClick={handleAddGoal}>Crear meta</Button>
+          </div>
+        ) : activeSheet === 'budget' ? (
+          <div className="space-y-4">
+            {([
+              ['needs', 'Limite de necesidades'],
+              ['wants', 'Limite de deseos'],
+              ['savings', 'Meta de ahorro'],
+            ] as const).map(([key, label]) => (
+              <label key={key} className="block text-sm font-medium text-stone-700 dark:text-stone-300">
+                {label} (Bs)
+                <input type="number" min="0.01" step="0.01" className="input-base mt-1.5" value={budgetForm[key]} onChange={(e) => setBudgetForm({ ...budgetForm, [key]: e.target.value })} />
+              </label>
+            ))}
+            <Button variant="primary" size="md" fullWidth loading={saving} onClick={handleCreateBudget}>Guardar presupuesto</Button>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">
@@ -254,6 +356,23 @@ export default function PresupuestoPage() {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">Cuenta</label>
+            <select className="input-base" value={txForm.accountId} onChange={(e) => setTxForm({ ...txForm, accountId: e.target.value })}>
+              {data.accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · Bs {account.balance.toLocaleString('es-BO')}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">Categoria</label>
+            <select className="input-base" value={txForm.category} onChange={(e) => setTxForm({ ...txForm, category: e.target.value })}>
+              <option value="needs">Necesidades</option>
+              <option value="wants">Deseos</option>
+              <option value="savings">Ahorro</option>
+              <option value="other">Otro</option>
+            </select>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1.5">
               Descripcion
             </label>
@@ -273,6 +392,8 @@ export default function PresupuestoPage() {
             <input
               type="number"
               inputMode="decimal"
+              min="0.01"
+              step="0.01"
               className="input-base"
               placeholder="0.00"
               value={txForm.amount}
@@ -280,10 +401,11 @@ export default function PresupuestoPage() {
             />
           </div>
 
-          <Button variant="primary" size="md" fullWidth onClick={handleAddTx}>
+          <Button variant="primary" size="md" fullWidth loading={saving} disabled={!data.accounts.length} onClick={handleAddTx}>
             Guardar transaccion
           </Button>
         </div>
+        )}
       </BottomSheet>
     </div>
   );

@@ -30,7 +30,7 @@ const FOOD_CATEGORIES = [
 
 const SUGGESTIONS = ['Arroz', 'Pollo', 'Papa', 'Cebolla', 'Tomate', 'Leche'];
 
-const CO2_PER_KWH = 0.38; // kg CO2 per kWh (Bolivia grid estimate)
+const CO2_PER_KWH = 0.5;
 
 interface ToastState { message: string; type: 'success' | 'error' | 'info' | 'warning' }
 
@@ -53,14 +53,15 @@ export default function RegistroPage() {
     e.preventDefault();
     if (!compra.item || !compra.amount) return;
     try {
-      await api.createPurchase({
+      const result = await api.createPurchase({
         householdId: 'hogar_001',
         category: compra.category,
         item: compra.item,
         amountBs: Number(compra.amount),
-        qty: Number(compra.qty) || 1,
+        quantity: Number(compra.qty) || 1,
         unit: compra.unit,
       });
+      if (!result) throw new Error('Purchase was not saved');
       showToast('Compra registrada. +5 pts', 'success');
       setCompra({ category: 'supermercado', item: '', amount: '', qty: '', unit: 'unidades' });
     } catch {
@@ -76,15 +77,20 @@ export default function RegistroPage() {
         householdId: 'hogar_001',
         name: alimento.name,
         category: alimento.category,
-        qty: Number(alimento.qty),
+        quantityKg: Number(alimento.qty),
       }) as any;
-      if (action === 'consume' && food?.id) await api.consumeFood(food.id);
-      if (action === 'waste'   && food?.id) await api.wasteFood(food.id);
+      if (!food?.id) throw new Error('Food was not saved');
+      if (action === 'consume' && !(await api.consumeFood(food.id))) {
+        throw new Error('Food consumption was not saved');
+      }
+      if (action === 'waste' && !(await api.wasteFood(food.id))) {
+        throw new Error('Food waste was not saved');
+      }
 
       const msgs: Record<typeof action, [string, ToastState['type']]> = {
-        store:   ['Alimento guardado. +2 pts',      'success'],
+        store:   ['Alimento guardado',              'success'],
         consume: ['Consumo registrado. +10 pts',    'success'],
-        waste:   ['Desperdicio registrado',          'warning'],
+        waste:   ['Desperdicio registrado. -5 pts',  'warning'],
       };
       showToast(...msgs[action]);
       setAlimento({ name: '', category: 'verduras', qty: '' });
@@ -97,12 +103,14 @@ export default function RegistroPage() {
     e.preventDefault();
     if (!energia.kwh) return;
     try {
-      await api.createEnergyReading({
+      const result = await api.createEnergyReading({
         householdId: 'hogar_001',
         kWh: Number(energia.kwh),
         deviceType: energia.type,
       });
-      showToast('Lectura de energia registrada. +5 pts', 'success');
+      if (!result) throw new Error('Energy reading was not saved');
+      const points = Number(energia.kwh) < 5 ? 15 : 3;
+      showToast(`Lectura de energia registrada. +${points} pts`, 'success');
       setEnergia({ type: 'general', kwh: '' });
     } catch {
       showToast('Error al registrar la lectura', 'error');
@@ -206,7 +214,7 @@ export default function RegistroPage() {
                   id="amount"
                   type="number"
                   inputMode="decimal"
-                  step="0.1"
+                  step="0.01"
                   min="0"
                   placeholder="0.00"
                   required
@@ -224,7 +232,7 @@ export default function RegistroPage() {
                     id="qty"
                     type="number"
                     inputMode="decimal"
-                    step="0.1"
+                    step="0.01"
                     min="0"
                     placeholder="1"
                     className="input-base rounded-r-none border-r-0"
@@ -301,7 +309,7 @@ export default function RegistroPage() {
                 id="food-qty"
                 type="number"
                 inputMode="decimal"
-                step="0.1"
+                step="0.01"
                 min="0"
                 placeholder="0.5"
                 required
@@ -370,7 +378,7 @@ export default function RegistroPage() {
                 id="kwh"
                 type="number"
                 inputMode="decimal"
-                step="0.1"
+                step="0.01"
                 min="0"
                 placeholder="Ej: 120"
                 required

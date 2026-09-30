@@ -100,7 +100,7 @@ export default function Navigation() {
           </div>
 
           {/* Last 2 items */}
-          {navItems.slice(2, 4).map(({ name, href, icon: Icon }) => {
+          {navItems.slice(2, 5).map(({ name, href, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (
               <Link

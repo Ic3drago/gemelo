@@ -18,6 +18,15 @@ interface ScannedData {
   items: ScannedItem[];
 }
 
+function toIsoDate(value: string | null): string {
+  if (!value) return '';
+  const match = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (!match) return '';
+  const [, day, month, rawYear] = match;
+  const year = rawYear.length === 2 ? `20${rawYear}` : rawYear;
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
 export default function EscanearPage() {
   const router = useRouter();
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -28,10 +37,13 @@ export default function EscanearPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [scannedData, setScannedData] = useState<ScannedData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const handleFile = (f: File) => {
+    if (preview) URL.revokeObjectURL(preview);
     setFile(f);
     setPreview(URL.createObjectURL(f));
+    setScanError(null);
   };
 
   const handleCameraInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,31 +61,27 @@ export default function EscanearPage() {
     try {
       const formData = new FormData();
       formData.append('invoice', file);
-      const resultRaw = await api.scanInvoice(formData);
-      const result = resultRaw as ScannedData | null;
+      const result = await api.scanInvoice(formData) as any;
+      const invoice = result?.data;
+      if (!result?.success || !invoice || !invoice.total) {
+        setScanError('No se pudo leer el total de esta factura. Prueba con una imagen mas nitida.');
+        setStep('capture');
+        return;
+      }
 
-      setScannedData(
-        result ?? {
-          store: 'Supermercado Hipermaxi',
-          date: new Date().toISOString().split('T')[0],
-          total: '345.50',
-          items: [
-            { name: 'Leche 1L', price: '7.50' },
-            { name: 'Pan integral', price: '12.00' },
-            { name: 'Manzanas 1kg', price: '15.50' },
-          ],
-        }
-      );
+      setScannedData({
+        store: '',
+        date: toIsoDate(invoice.date),
+        total: String(invoice.total).replace(',', '.'),
+        items: Array.isArray(invoice.items)
+          ? invoice.items.map((item: any) => ({ name: item.name, price: String(item.price).replace(',', '.') }))
+          : [],
+      });
+      setScanError(null);
       setStep('review');
     } catch {
-      // Use mock data on failure so the user can still proceed
-      setScannedData({
-        store: 'Tienda',
-        date: new Date().toISOString().split('T')[0],
-        total: '',
-        items: [],
-      });
-      setStep('review');
+      setScanError('No se pudo procesar la imagen. Intenta nuevamente.');
+      setStep('capture');
     }
   };
 
@@ -81,11 +89,16 @@ export default function EscanearPage() {
     if (!scannedData) return;
     setSaving(true);
     try {
-      await api.saveInvoice({
+      const result = await api.saveInvoice({
         householdId: 'hogar_001',
         ...scannedData,
         total: Number(scannedData.total),
       });
+      if (!result) {
+        setScanError('No se pudo guardar la factura. Revisa los datos e intenta otra vez.');
+        setSaving(false);
+        return;
+      }
       router.push('/');
     } catch {
       setSaving(false);
@@ -95,8 +108,10 @@ export default function EscanearPage() {
   const reset = () => {
     setStep('capture');
     setFile(null);
+    if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     setScannedData(null);
+    setScanError(null);
   };
 
   return (
@@ -119,6 +134,7 @@ export default function EscanearPage() {
       {/* ── Step: Capture ── */}
       {step === 'capture' && (
         <Card variant="flat" padding={false} className="overflow-hidden">
+          {scanError && <p role="alert" className="p-4 text-sm text-rose-700 bg-rose-50 dark:bg-rose-950 dark:text-rose-300">{scanError}</p>}
           {/* Camera preview / dropzone */}
           <div className="relative bg-stone-100 dark:bg-stone-800 aspect-[3/4] flex items-center justify-center">
             {preview ? (
@@ -233,6 +249,7 @@ export default function EscanearPage() {
                 id="store"
                 type="text"
                 className="input-base"
+                placeholder="No identificada"
                 value={scannedData.store}
                 onChange={(e) => setScannedData({ ...scannedData, store: e.target.value })}
               />

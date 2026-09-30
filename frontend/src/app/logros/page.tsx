@@ -20,7 +20,7 @@ interface Profile {
 interface Achievement {
   id: string;
   name: string;
-  desc: string;
+  description: string;
   unlocked: boolean;
   icon?: string;
 }
@@ -33,6 +33,14 @@ interface HistoryItem {
 }
 
 const ACHIEVEMENT_ICONS: Record<string, React.ReactNode> = {};
+
+function getLevelProgress(points: number, level: number): number {
+  const thresholds = [0, 101, 501, 1501];
+  if (level >= 4) return 100;
+  const start = thresholds[Math.max(0, level - 1)];
+  const next = thresholds[level];
+  return Math.max(0, Math.min(100, Math.round(((points - start) / (next - start)) * 100)));
+}
 
 // Fallback icon map for common achievement names
 function getAchievementIcon(name: string) {
@@ -62,33 +70,33 @@ export default function LogrosPage() {
         const achData = achRaw as any;
         const histData = histRaw as any;
 
+        if (!profData) {
+          setProfile(null);
+          setAchievements([]);
+          setHistory([]);
+          return;
+        }
+
         setProfile({
-          name: profData?.name ?? 'Hogar Cochabamba',
-          points: profData?.points ?? 340,
-          level: profData?.level ?? 2,
-          levelName: profData?.levelName ?? 'Consciente',
-          progress: profData?.progress ?? 60,
+          name: profData.name ?? 'Mi hogar',
+          points: Number(profData.points ?? 0),
+          level: Number(profData.level ?? 1),
+          levelName: profData.levelName ?? 'Principiante',
+          progress: profData.progress ?? getLevelProgress(Number(profData.points ?? 0), Number(profData.level ?? 1)),
         });
 
         setAchievements(
-          Array.isArray(achData) && achData.length > 0
-            ? achData
-            : [
-                { id: '1', name: 'Primera lectura',   desc: 'Registra tu primer consumo de energia',  unlocked: true  },
-                { id: '2', name: 'Cero desperdicio',  desc: 'Una semana sin desperdiciar alimentos',  unlocked: true  },
-                { id: '3', name: 'Ahorro eficiente',  desc: 'Cumple tu meta de ahorro un mes',        unlocked: false },
-                { id: '4', name: 'Semana verde',      desc: 'Reduce tu huella de carbono 20% en 7 dias', unlocked: false },
-                { id: '5', name: 'Explorador',        desc: 'Usa todas las funciones del gemelo',     unlocked: true  },
-                { id: '6', name: 'Habito formado',    desc: 'Registra datos 30 dias consecutivos',    unlocked: false },
-              ]
+          Array.isArray(achData)
+            ? achData.map((achievement: any) => ({
+                ...achievement,
+                description: achievement.description ?? achievement.desc ?? '',
+                unlocked: Boolean(achievement.isUnlocked ?? achievement.unlocked),
+              }))
+            : []
         );
 
         setHistory(
-          (Array.isArray(histData) && histData.length > 0 ? histData : [
-            { id: '1', action: 'Lectura de energia registrada',  points: 5,  time: '2025-01-15' },
-            { id: '2', action: 'Alimento consumido',             points: 10, time: '2025-01-14' },
-            { id: '3', action: 'Compra registrada',              points: 5,  time: '2025-01-13' },
-          ]).map((h: any, i: number) => ({
+          (Array.isArray(histData) ? histData : []).map((h: any, i: number) => ({
             id: h.id ?? String(i),
             action: h.description ?? h.action ?? 'Accion',
             points: Number(h.points ?? 0),
@@ -193,7 +201,7 @@ export default function LogrosPage() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-stone-800 dark:text-stone-100 leading-tight">{ach.name}</p>
-                  <p className="text-[11px] text-stone-400 mt-0.5 leading-tight">{ach.desc}</p>
+                  <p className="text-[11px] text-stone-400 mt-0.5 leading-tight">{ach.description}</p>
                 </div>
               </Card>
             ))}
